@@ -432,13 +432,6 @@ export function ManageUserModal({
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="bg-amber-100 hover:bg-amber-200 text-amber-900"
-            >
-              Impersonate User
-            </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
