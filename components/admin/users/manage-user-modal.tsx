@@ -163,6 +163,26 @@ export function ManageUserModal({
     },
   );
 
+  const { mutate: setTempPassword, isLoading: isSettingPassword } = useMutation(
+    async () => {
+      if (!userId) throw new Error("User ID is required");
+      const password = formData.tempPassword?.trim();
+      if (!password) throw new Error("Temporary password is required");
+      await userAPI.setTemporaryPassword(userId, { password });
+    },
+    {
+      onSuccess: () => {
+        toast.success("Temporary password set");
+        setFormData((prev) => ({ ...prev, tempPassword: "" }));
+      },
+      onError: (error: any) => {
+        toast.error(
+          error?.response?.data?.message || error?.message || "Failed to set password",
+        );
+      },
+    },
+  );
+
   const togglePermission = (permissionId: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -238,7 +258,6 @@ export function ManageUserModal({
                   <SelectItem value="User">User</SelectItem>
                   <SelectItem value="Sub-Admin">Sub-Admin</SelectItem>
                   <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Storeman">Storeman</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -386,6 +405,28 @@ export function ManageUserModal({
               <div
                 className={`w-2 h-2 rounded-full ${formData.isActive ? "bg-green-500 animate-pulse" : "bg-slate-300"}`}
               />
+            </div>
+          </div>
+
+          {/* Credential Management */}
+          <div className="space-y-3">
+            <Label className="text-slate-700 font-bold">Credential Management</Label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Input
+                placeholder="Enter a temporary Password...."
+                value={formData.tempPassword}
+                onChange={(e) =>
+                  setFormData({ ...formData, tempPassword: e.target.value })
+                }
+              />
+              <Button
+                type="button"
+                className="sm:w-auto bg-[#1E3A8A] hover:bg-[#152a61] text-white rounded-full px-6"
+                onClick={() => setTempPassword()}
+                disabled={isSettingPassword || !formData.tempPassword?.trim()}
+              >
+                {isSettingPassword ? "Setting..." : "Set Password"}
+              </Button>
             </div>
           </div>
 

@@ -9,7 +9,6 @@ import {
   Users,
   TrendingUp,
   MessageSquare,
-  CreditCard,
   Bell,
   Settings,
   LogOut,
@@ -25,7 +24,7 @@ const menuItems = [
   { icon: BookOpen, label: 'Exam Content', href: '/admin/exams' },
   { icon: Users, label: 'User Management', href: '/admin/users' },
   { icon: TrendingUp, label: 'Revenue', href: '/admin/revenue' },
-  { icon: MessageSquare, label: 'Receiving Testimonials', href: '/admin/testimonials' },
+  { icon: TrendingUp, label: 'Review', href: '/admin/review' },
   { icon: Bell, label: 'Announcement', href: '/admin/announcements' },
   { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];

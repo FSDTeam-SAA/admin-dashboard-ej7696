@@ -248,6 +248,27 @@ export const testimonialAPI = {
     axiosInstance.delete(`/api/v1/testimonial/${testimonialId}`),
 };
 
+// ============ REVIEWS APIs ============
+
+export const reviewAPI = {
+  listAdminReviews: (
+    page = 1,
+    limit = 10,
+    filters?: { status?: string; examId?: string; userId?: string }
+  ) => {
+    const query = buildQueryString({ page, limit, ...filters });
+    return axiosInstance.get(`/api/v1/exam/reviews/admin${query}`);
+  },
+
+  updateReview: (
+    reviewId: string,
+    data: { status?: string; stars?: number; feedbackText?: string; displayName?: string }
+  ) => axiosInstance.patch(`/api/v1/exam/reviews/${reviewId}`, data),
+
+  deleteReview: (reviewId: string) =>
+    axiosInstance.delete(`/api/v1/exam/reviews/${reviewId}`),
+};
+
 // ============ SUBSCRIPTIONS APIs ============
 
 export const subscriptionAPI = {

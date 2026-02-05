@@ -20,7 +20,7 @@ interface ProvidersProps {
 
 export function Providers({ children }: ProvidersProps) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={60} refetchOnWindowFocus>
       <QueryClientProvider client={queryClient}>
         {children}
         <Toaster position="top-right" />

@@ -160,7 +160,7 @@ export default function AnnouncementsPage() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="rounded-full px-6"
+                    className="rounded-full px-6 text-red-600 hover:bg-red-50"
                     onClick={() => {
                       setSelectedAnnouncementId(announcement._id);
                       setIsDeleteDialogOpen(true);

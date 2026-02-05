@@ -1,9 +1,9 @@
 // @/components/admin/header.tsx
-'use client';
+"use client";
 
-import React from 'react';
-import { Search } from 'lucide-react';
-import Image from 'next/image';
+import { Avatar } from "@radix-ui/react-avatar";
+import { Search } from "lucide-react";
+import Image from "next/image";
 
 /**
  * Refined Header with custom linear-gradient background.
@@ -11,9 +11,10 @@ import Image from 'next/image';
  */
 export default function Header() {
   return (
-    <header 
+    <header
       style={{
-        background: 'linear-gradient(90.17deg, #DDE8FF 0.18%, #FFFFFF 41.93%, #DEE9FF 69.76%, #FFFFFF 100%)'
+        background:
+          "linear-gradient(90.17deg, #DDE8FF 0.18%, #FFFFFF 41.93%, #DEE9FF 69.76%, #FFFFFF 100%)",
       }}
       className="flex items-center justify-between px-8 py-5 w-full border-b border-blue-100/50"
     >
@@ -32,16 +33,20 @@ export default function Header() {
       {/* User Profile Section */}
       <div className="flex items-center gap-4">
         <span className="text-[14px] font-bold text-slate-800">
-          Emmanuel Zibili
+         Admin
         </span>
         <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-          <Image
-            src="https://i.pravatar.cc/150?u=emmanuel" 
-            alt="User Avatar"
-            width={40}
-            height={40}
-            className="object-cover"
-          />
+          <Avatar
+            asChild
+            className="w-full h-full object-cover"
+          >
+            <Image
+              src="/admin-avatar.jpg"
+              alt="Admin Avatar"
+              width={40}
+              height={40}
+            />
+          </Avatar>
         </div>
       </div>
     </header>
