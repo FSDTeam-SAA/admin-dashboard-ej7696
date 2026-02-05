@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useQuery } from 'react-query';
-import { paymentAPI } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
-import { Search, DollarSign, Trash2 } from 'lucide-react';
+import { useMemo, useState } from "react";
+import { useQuery } from "react-query";
+import { paymentAPI } from "@/lib/api";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { Search, DollarSign, Trash2 } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -20,41 +20,45 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from 'recharts';
+} from "recharts";
+
+type Range = "day" | "week" | "month";
 
 export default function RevenuePage() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [range, setRange] = useState<'day' | 'week' | 'month'>('day');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [range, setRange] = useState<Range>("day");
 
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery(
-    'revenue-summary',
-    paymentAPI.getRevenueSummary,
+    ["revenue-summary", range], // ✅ refetch when range changes
+    () => paymentAPI.getRevenueSummary({ range }), // ✅ pass range to API (adjust if your API signature differs)
     {
       onError: (error: any) => {
-        toast.error('Failed to load revenue summary');
-        console.error('[v0] Revenue summary error:', error);
+        toast.error("Failed to load revenue summary");
+        console.error("[v0] Revenue summary error:", error);
       },
+      keepPreviousData: true,
     }
   );
 
   const { data: purchasesData, isLoading: isPurchasesLoading } = useQuery(
-    ['purchases', currentPage],
+    ["purchases", currentPage],
     () => paymentAPI.getPurchasesList(currentPage, 10),
     {
       onError: (error: any) => {
-        toast.error('Failed to load purchases');
-        console.error('[v0] Purchases error:', error);
+        toast.error("Failed to load purchases");
+        console.error("[v0] Purchases error:", error);
       },
+      keepPreviousData: true,
     }
   );
 
   const { data: pricingData } = useQuery(
-    'pricing-settings',
+    "pricing-settings",
     paymentAPI.getPricingSettings,
     {
       onError: (error: any) => {
-        console.error('[v0] Pricing settings error:', error);
+        console.error("[v0] Pricing settings error:", error);
       },
     }
   );
@@ -65,43 +69,77 @@ export default function RevenuePage() {
   const pricing = pricingData?.data?.data;
 
   const filteredPurchases = purchases.filter((purchase: any) => {
-    const email = purchase.user?.email || '';
-    const name = purchase.user?.name || '';
+    const email = purchase.user?.email || "";
+    const name = purchase.user?.name || "";
     return (
       email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
+  // ✅ now chart changes after clicking Day/Week/Month
   const chartData = useMemo(() => {
-    const daily = summaryPayload?.dailyRevenue || [];
-    if (!daily.length) {
-      return [
-        { label: '1 D', value: 30 },
-        { label: '2 D', value: 65 },
-        { label: '3 D', value: 45 },
-        { label: '4 D', value: 120 },
-        { label: '5 D', value: 80 },
-        { label: '6 D', value: 100 },
-        { label: '7 D', value: 75 },
-      ];
+    if (!summaryPayload) return [];
+
+    // assume API returns different arrays depending on range
+    // - day => dailyRevenue
+    // - week => weeklyRevenue
+    // - month => monthlyRevenue
+    const keyMap: Record<Range, string> = {
+      day: "dailyRevenue",
+      week: "weeklyRevenue",
+      month: "monthlyRevenue",
+    };
+
+    const list = summaryPayload?.[keyMap[range]] || [];
+
+    // fallback demo data if API empty
+    if (!Array.isArray(list) || list.length === 0) {
+      const labels =
+        range === "day"
+          ? ["1 D", "2 D", "3 D", "4 D", "5 D", "6 D", "7 D"]
+          : range === "week"
+          ? ["1 W", "2 W", "3 W", "4 W"]
+          : ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+      return labels.map((label, idx) => ({
+        label,
+        value: [30, 65, 45, 120, 80, 100, 75][idx] ?? 50,
+      }));
     }
-    return daily.map((item: any, index: number) => ({
-      label: `${index + 1} D`,
-      value: item.count || item.revenue || 0,
+
+    return list.map((item: any, index: number) => ({
+      label:
+        item.label ||
+        item.date ||
+        item.week ||
+        item.month ||
+        (range === "day"
+          ? `${index + 1} D`
+          : range === "week"
+          ? `${index + 1} W`
+          : `${index + 1} M`),
+      value: item.count ?? item.revenue ?? item.value ?? 0,
     }));
-  }, [summaryPayload]);
+  }, [summaryPayload, range]);
 
   const surveyData = useMemo(() => {
-    const professional = purchases.filter((p: any) => p.purchaseType === 'plan').length;
-    const starter = purchases.filter((p: any) => p.purchaseType !== 'plan').length;
+    const professional = purchases.filter((p: any) => p.purchaseType === "plan")
+      .length;
+    const starter = purchases.filter((p: any) => p.purchaseType !== "plan")
+      .length;
     return [
-      { name: 'Professional', value: professional },
-      { name: 'Starter Package', value: starter },
+      { name: "Professional", value: professional },
+      { name: "Starter Package", value: starter },
     ];
   }, [purchases]);
 
-  const COLORS = ['#2b6cb0', '#38b2ac'];
+  const COLORS = ["#2b6cb0", "#38b2ac"];
+
+  // ✅ show title based on range
+  const analyticsTitle = useMemo(() => {
+    const suffix = range === "day" ? "Daily" : range === "week" ? "Weekly" : "Monthly";
+    return `Analytics & Reports (${suffix}) for subscription`;
+  }, [range]);
 
   return (
     <div className="flex-1 space-y-6">
@@ -129,7 +167,7 @@ export default function RevenuePage() {
               <Skeleton className="h-8 w-32 mt-2" />
             ) : (
               <p className="text-3xl font-bold text-cyan-900 mt-2">
-                ${summaryPayload?.totalRevenue ?? '0.00'}
+                ${summaryPayload?.totalRevenue ?? "0.00"}
               </p>
             )}
           </div>
@@ -143,14 +181,22 @@ export default function RevenuePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Analytics & Reports for subscription</h2>
+            {/* ✅ fixed title + changes based on range */}
+            <h2 className="text-lg font-semibold text-gray-900">
+              {analyticsTitle}
+            </h2>
+
+            {/* ✅ Clicking Day/Week/Month triggers refetch + chart update */}
             <div className="flex gap-2 bg-gray-100 rounded-full p-1">
-              {(['day', 'week', 'month'] as const).map((item) => (
+              {(["day", "week", "month"] as const).map((item) => (
                 <button
                   key={item}
+                  type="button"
                   onClick={() => setRange(item)}
-                  className={`px-4 py-1 text-xs rounded-full ${
-                    range === item ? 'bg-blue-700 text-white' : 'text-gray-600'
+                  className={`px-4 py-1 text-xs rounded-full transition ${
+                    range === item
+                      ? "bg-blue-700 text-white"
+                      : "text-gray-600 hover:bg-white"
                   }`}
                 >
                   {item.charAt(0).toUpperCase() + item.slice(1)}
@@ -158,6 +204,7 @@ export default function RevenuePage() {
               ))}
             </div>
           </div>
+
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -170,12 +217,23 @@ export default function RevenuePage() {
         </Card>
 
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900">Survey for Subscription</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Survey for Subscription
+          </h2>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={surveyData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
+              <Pie
+                data={surveyData}
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                dataKey="value"
+              >
                 {surveyData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
               <Tooltip />
@@ -199,26 +257,57 @@ export default function RevenuePage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">User</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Email</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Payment</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Subscription</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Status</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Time limited</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">Action</th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  User
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Email
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Payment
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Subscription
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Status
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Time limited
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
               {isPurchasesLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-6"><Skeleton className="h-4 w-24" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-4 w-32" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-4 w-20" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-4 w-24" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-6 w-20" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-4 w-20" /></td>
-                    <td className="py-4 px-6"><Skeleton className="h-8 w-10" /></td>
+                  <tr
+                    key={i}
+                    className="border-b border-gray-100 hover:bg-gray-50"
+                  >
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-4 w-20" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-6 w-20" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-4 w-20" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <Skeleton className="h-8 w-10" />
+                    </td>
                   </tr>
                 ))
               ) : filteredPurchases.length === 0 ? (
@@ -230,42 +319,59 @@ export default function RevenuePage() {
               ) : (
                 filteredPurchases.map((purchase: any) => {
                   const subscription =
-                    purchase.purchaseType === 'plan' ? 'Professional' : 'Starter';
+                    purchase.purchaseType === "plan" ? "Professional" : "Starter";
                   const timeLimited =
-                    purchase.purchaseType === 'plan'
-                      ? `For ${pricing?.professionalPlanIntervalCount || 3} ${pricing?.professionalPlanIntervalUnit || 'months'}`
-                      : '-';
+                    purchase.purchaseType === "plan"
+                      ? `For ${
+                          pricing?.professionalPlanIntervalCount || 3
+                        } ${pricing?.professionalPlanIntervalUnit || "months"}`
+                      : "-";
                   return (
-                    <tr key={purchase.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr
+                      key={purchase.id}
+                      className="border-b border-gray-100 hover:bg-gray-50"
+                    >
                       <td className="py-4 px-6 text-sm text-gray-900">
-                        {purchase.user?.name || 'User'}
+                        {purchase.user?.name || "User"}
                       </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">{purchase.user?.email || 'N/A'}</td>
-                      <td className="py-4 px-6 text-sm text-gray-900">${purchase.price ?? '0.00'}</td>
+                      <td className="py-4 px-6 text-sm text-gray-600">
+                        {purchase.user?.email || "N/A"}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-gray-900">
+                        ${purchase.price ?? "0.00"}
+                      </td>
                       <td className="py-4 px-6 text-sm">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          subscription === 'Professional'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            subscription === "Professional"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
                           {subscription}
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          purchase.paymentStatus === 'completed'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {purchase.paymentStatus === 'completed' ? 'Active' : 'Pending'}
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            purchase.paymentStatus === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {purchase.paymentStatus === "completed"
+                            ? "Active"
+                            : "Pending"}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">{timeLimited}</td>
+                      <td className="py-4 px-6 text-sm text-gray-600">
+                        {timeLimited}
+                      </td>
                       <td className="py-4 px-6">
                         <Button
                           size="icon"
                           className="h-9 w-9 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                          onClick={() => toast.info('Delete action coming soon')}
+                          onClick={() => toast.info("Delete action coming soon")}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -283,7 +389,8 @@ export default function RevenuePage() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600">
-              Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, purchasesPayload?.meta?.total || 0)} of{' '}
+              Showing {(currentPage - 1) * 10 + 1} to{" "}
+              {Math.min(currentPage * 10, purchasesPayload?.meta?.total || 0)} of{" "}
               {purchasesPayload?.meta?.total || 0} results
             </p>
             <div className="flex gap-2">
@@ -293,28 +400,36 @@ export default function RevenuePage() {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               >
-                {'<'}
+                {"<"}
               </Button>
-              {Array.from({ length: Math.min(3, Math.ceil((purchasesPayload?.meta?.total || 0) / 10)) }).map(
-                (_, i) => (
-                  <Button
-                    key={i + 1}
-                    variant={currentPage === i + 1 ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={currentPage === i + 1 ? 'bg-blue-600 text-white' : ''}
-                  >
-                    {i + 1}
-                  </Button>
-                )
-              )}
+
+              {Array.from({
+                length: Math.min(
+                  3,
+                  Math.ceil((purchasesPayload?.meta?.total || 0) / 10)
+                ),
+              }).map((_, i) => (
+                <Button
+                  key={i + 1}
+                  variant={currentPage === i + 1 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={currentPage === i + 1 ? "bg-blue-600 text-white" : ""}
+                >
+                  {i + 1}
+                </Button>
+              ))}
+
               <Button
                 variant="outline"
                 size="sm"
-                disabled={currentPage >= Math.ceil((purchasesPayload?.meta?.total || 0) / 10)}
+                disabled={
+                  currentPage >=
+                  Math.ceil((purchasesPayload?.meta?.total || 0) / 10)
+                }
                 onClick={() => setCurrentPage(currentPage + 1)}
               >
-                {'>'}
+                {">"}
               </Button>
             </div>
           </div>
