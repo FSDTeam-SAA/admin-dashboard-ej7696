@@ -8,13 +8,15 @@ import {
   BookOpen,
   Users,
   TrendingUp,
-  MessageSquare,
   Bell,
   Settings,
   LogOut,
   Menu,
   X,
+  Star,
+  Headset,
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import Image from 'next/image';
@@ -24,12 +26,13 @@ const menuItems = [
   { icon: BookOpen, label: 'Exam Content', href: '/admin/exams' },
   { icon: Users, label: 'User Management', href: '/admin/users' },
   { icon: TrendingUp, label: 'Revenue', href: '/admin/revenue' },
-  { icon: TrendingUp, label: 'Review', href: '/admin/review' },
+  { icon: Star, label: 'Review', href: '/admin/review' }, // ✅ updated
   { icon: Bell, label: 'Announcement', href: '/admin/announcements' },
+  { icon: Headset, label: 'Support', href: '/admin/support' }, // ✅ updated
   { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];
 
-export function Sidebar({ userName = 'Admin' }) {
+export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -50,7 +53,8 @@ export function Sidebar({ userName = 'Admin' }) {
       {/* Sidebar */}
       <aside
         style={{
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #E5EEFF 20.91%, #EDF3FF 41.83%, #DEE9FF 69.71%, #FFFFFF 100%)',
+          background:
+            'linear-gradient(180deg, #FFFFFF 0%, #E5EEFF 20.91%, #EDF3FF 41.83%, #DEE9FF 69.71%, #FFFFFF 100%)',
         }}
         className={`fixed left-0 top-0 h-screen w-72 border-r border-blue-100 text-slate-700 flex flex-col transition-all duration-300 z-40 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -58,13 +62,20 @@ export function Sidebar({ userName = 'Admin' }) {
       >
         {/* Logo Section */}
         <div className="pt-10 flex flex-col items-center">
-          <Image src="/logo.png" alt="Logo" width={100} height={100} className="mb-2" />
+          <Image
+            src="/logo.png"
+            alt="Logo"
+            width={100}
+            height={100}
+            className="mb-2"
+            priority
+          />
+          <p className="text-sm font-semibold text-slate-600">{userName}</p>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-6 space-y-2 mt-4">
+        <nav className="flex-1 px-6 space-y-2 mt-6">
           {menuItems.map((item) => {
-            // Strict active check: only true if pathname matches exactly or is the primary root
             const isActive = pathname === item.href;
             const Icon = item.icon;
 
@@ -79,7 +90,11 @@ export function Sidebar({ userName = 'Admin' }) {
                     : 'hover:bg-blue-50 text-slate-600'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-[#254391]'}`} />
+                <Icon
+                  className={`w-5 h-5 ${
+                    isActive ? 'text-white' : 'text-slate-500 group-hover:text-[#254391]'
+                  }`}
+                />
                 <span className={`font-semibold text-[15px] ${isActive ? 'text-white' : ''}`}>
                   {item.label}
                 </span>
@@ -107,19 +122,23 @@ export function Sidebar({ userName = 'Admin' }) {
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <LogOut className="w-8 h-8 text-red-500" />
             </div>
+
             <h3 className="text-xl font-bold text-slate-900">Sign Out</h3>
-            <p className="text-slate-500 mt-2">Are you sure you want to log out of the admin dashboard?</p>
-            
+            <p className="text-slate-500 mt-2">
+              Are you sure you want to log out of the admin dashboard?
+            </p>
+
             <div className="flex gap-3 mt-8">
-              <Button 
-                variant="ghost" 
-                className="flex-1 hover:bg-slate-100 text-slate-600 font-semibold" 
+              <Button
+                variant="ghost"
+                className="flex-1 hover:bg-slate-100 text-slate-600 font-semibold"
                 onClick={() => setShowLogoutModal(false)}
               >
                 No, Cancel
               </Button>
-              <Button 
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md" 
+
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md"
                 onClick={handleLogout}
               >
                 Yes, Logout
@@ -131,7 +150,10 @@ export function Sidebar({ userName = 'Admin' }) {
 
       {/* Mobile Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/20 z-30 md:hidden" onClick={() => setIsOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/20 z-30 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
       )}
     </>
   );

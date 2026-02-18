@@ -65,6 +65,11 @@ export default function SettingsPage() {
   const [featureInput, setFeatureInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // ✅ AI model modal states
+  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
+  const [isUpdatingModel, setIsUpdatingModel] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gemini-3-flash-preview");
+
   // ✅ Change password modal states
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -187,6 +192,49 @@ export default function SettingsPage() {
     }
   };
 
+  // ✅ AI model modal handlers
+  const openModelModal = () => {
+    setIsModelModalOpen(true);
+  };
+
+  const closeModelModal = () => {
+    if (isUpdatingModel) return;
+    setIsModelModalOpen(false);
+  };
+
+  const handleUpdateModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedModel) {
+      toast.error("Please select a model");
+      return;
+    }
+
+    setIsUpdatingModel(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/config-model`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model_name: selectedModel }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update AI model");
+      }
+
+      toast.success("AI model updated successfully");
+      setIsModelModalOpen(false);
+    } catch (error: any) {
+      console.error("[Settings] Update model error:", error);
+      toast.error(error?.message || "Failed to update AI model");
+    } finally {
+      setIsUpdatingModel(false);
+    }
+  };
+
   // ✅ Password modal handlers
   const openPasswordModal = () => {
     setPasswordForm({
@@ -269,6 +317,11 @@ export default function SettingsPage() {
           <p className="text-gray-500 mt-2">
             Configure pricing, subscription intervals, and plan features.
           </p>
+        </div>
+        <div>
+          <Button type="button" onClick={openModelModal}>
+            Change AI model
+          </Button>
         </div>
         <div>
           <Button type="button" onClick={openPasswordModal} className="gap-2">
@@ -491,6 +544,63 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* ✅ Change AI Model Modal */}
+      <Dialog
+        open={isModelModalOpen}
+        onOpenChange={(open) => {
+          if (isUpdatingModel) return;
+          setIsModelModalOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle>Change AI Model</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateModel} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Select Model
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={isUpdatingModel}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="gemini-3-flash-preview">
+                  Gemini 3 Flash (Preview)
+                </option>
+                <option value="gpt-4.1-2025-04-14">
+                  gpt-4.1-2025-04-14
+                </option>
+              </select>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeModelModal}
+                disabled={isUpdatingModel}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isUpdatingModel}>
+                {isUpdatingModel ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Model"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ Change Password Modal */}
       <Dialog

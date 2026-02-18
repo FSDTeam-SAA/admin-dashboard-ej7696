@@ -48,7 +48,7 @@ const refreshAccessToken = async (token: any) => {
       error: undefined,
     };
   } catch (error) {
-    console.error('[v0] Refresh token error:', error);
+    console.error(' Refresh token error:', error);
     return {
       ...token,
       error: 'RefreshAccessTokenError',

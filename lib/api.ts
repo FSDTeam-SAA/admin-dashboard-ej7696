@@ -190,6 +190,18 @@ export const supportAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
+  listTickets: (
+    page = 1,
+    limit = 20,
+    filters?: { status?: string; search?: string }
+  ) => {
+    const query = buildQueryString({ page, limit, ...filters });
+    return axiosInstance.get(`/api/v1/support${query}`);
+  },
+
+  getTicketDetails: (ticketId: string) =>
+    axiosInstance.get(`/api/v1/support/${ticketId}`),
+
   replyToTicket: (ticketId: string, formData: FormData) =>
     axiosInstance.post(`/api/v1/support/${ticketId}/reply`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
