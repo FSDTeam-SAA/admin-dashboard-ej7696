@@ -1,20 +1,21 @@
-'use client';
+"use client";
 
-import React from "react"
+import React from "react";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { authAPI } from '@/lib/api';
-import { toast } from 'sonner';
-import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { authAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { Mail, ArrowLeft, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -25,10 +26,10 @@ export default function ForgotPasswordPage() {
     try {
       await authAPI.forgotPassword({ email });
       setIsSubmitted(true);
-      toast.success('OTP sent to your email');
+      toast.success("OTP sent to your email");
     } catch (error: any) {
-      console.error('[v0] Forgot password error:', error);
-      toast.error(error.response?.data?.message || 'Failed to send OTP');
+      console.error("[v0] Forgot password error:", error);
+      toast.error(error.response?.data?.message || "Failed to send OTP");
     } finally {
       setIsLoading(false);
     }
@@ -39,26 +40,30 @@ export default function ForgotPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
         <Card className="w-full max-w-md shadow-lg">
           <div className="p-8">
+            {/* Logo */}
             <div className="flex justify-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
+              <Image src="/logo.png" alt="Logo" width={100} height={100} />
             </div>
 
-            <h1 className="text-2xl font-bold text-center mb-2">Check Your Email</h1>
-            <p className="text-center text-gray-600 text-sm mb-8">We've sent a password reset link to {email}</p>
+            <h1 className="text-2xl font-bold text-center mb-2">
+              Check Your Email
+            </h1>
+            <p className="text-center text-gray-600 text-sm mb-8">
+              We've sent a password reset link to {email}
+            </p>
 
             <Button
-              onClick={() => router.push('/auth/verify-otp')}
+              onClick={() => router.push("/auth/verify-otp")}
               className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full"
             >
               Enter OTP
             </Button>
 
             <div className="mt-4 text-center">
-              <Link href="/auth/login" className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2">
+              <Link
+                href="/auth/login"
+                className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2"
+              >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Login
               </Link>
@@ -73,20 +78,24 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <div className="p-8">
+          {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-13h4v6h-4z" />
-              </svg>
-            </div>
+            <Image src="/logo.png" alt="Logo" width={100} height={100} />
           </div>
 
-          <h1 className="text-2xl font-bold text-center mb-2">Forgot Password</h1>
-          <p className="text-center text-gray-600 text-sm mb-8">Enter your registered email address. We'll send you a code to reset your password.</p>
+          <h1 className="text-2xl font-bold text-center mb-2">
+            Forgot Password
+          </h1>
+          <p className="text-center text-gray-600 text-sm mb-8">
+            Enter your registered email address. We'll send you a code to reset
+            your password.
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <Input
@@ -112,13 +121,16 @@ export default function ForgotPasswordPage() {
                   Sending...
                 </>
               ) : (
-                'Send OTP'
+                "Send OTP"
               )}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
-            <Link href="/auth/login" className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2">
+            <Link
+              href="/auth/login"
+              className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2"
+            >
               <ArrowLeft className="w-4 h-4" />
               Back to Login
             </Link>

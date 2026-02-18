@@ -1,21 +1,22 @@
-'use client';
+"use client";
 
-import React from "react"
+import React from "react";
 
-import { useState, useRef, useEffect, Suspense } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { authAPI } from '@/lib/api';
-import { toast } from 'sonner';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, Suspense } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { authAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 function VerifyOTPContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(300); // 5 minutes
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -38,17 +39,17 @@ function VerifyOTPContent() {
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const otpValue = otp.join('');
+    const otpValue = otp.join("");
 
     if (otpValue.length !== 6) {
-      toast.error('Please enter all 6 digits');
+      toast.error("Please enter all 6 digits");
       return;
     }
 
@@ -56,11 +57,11 @@ function VerifyOTPContent() {
 
     try {
       await authAPI.verifyEmail({ token: otpValue });
-      toast.success('OTP verified! Proceeding to reset password');
+      toast.success("OTP verified! Proceeding to reset password");
       router.push(`/auth/reset-password?token=${otpValue}`);
     } catch (error: any) {
-      console.error('[v0] Verify OTP error:', error);
-      toast.error(error.response?.data?.message || 'Invalid OTP');
+      console.error("[v0] Verify OTP error:", error);
+      toast.error(error.response?.data?.message || "Invalid OTP");
     } finally {
       setIsLoading(false);
     }
@@ -68,13 +69,13 @@ function VerifyOTPContent() {
 
   const handleResendOtp = async () => {
     try {
-      await authAPI.forgotPassword({ email: searchParams.get('email') || '' });
+      await authAPI.forgotPassword({ email: searchParams.get("email") || "" });
       setTimer(300);
-      setOtp(['', '', '', '', '', '']);
-      toast.success('OTP resent to your email');
+      setOtp(["", "", "", "", "", ""]);
+      toast.success("OTP resent to your email");
     } catch (error: any) {
-      console.error('[v0] Resend OTP error:', error);
-      toast.error('Failed to resend OTP');
+      console.error("[v0] Resend OTP error:", error);
+      toast.error("Failed to resend OTP");
     }
   };
 
@@ -82,16 +83,15 @@ function VerifyOTPContent() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <div className="p-8">
+          {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-13h4v6h-4z" />
-              </svg>
-            </div>
+            <Image src="/logo.png" alt="Logo" width={100} height={100} />
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2">Enter OTP</h1>
-          <p className="text-center text-gray-600 text-sm mb-8">We've sent a 6-digit code to your email</p>
+          <p className="text-center text-gray-600 text-sm mb-8">
+            We've sent a 6-digit code to your email
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* OTP Input Fields */}
@@ -118,9 +118,10 @@ function VerifyOTPContent() {
             <div className="text-center">
               {timer > 0 ? (
                 <p className="text-sm text-gray-600">
-                  OTP expires in{' '}
+                  OTP expires in{" "}
                   <span className="font-semibold text-blue-600">
-                    {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}
+                    {Math.floor(timer / 60)}:
+                    {(timer % 60).toString().padStart(2, "0")}
                   </span>
                 </p>
               ) : (
@@ -140,7 +141,7 @@ function VerifyOTPContent() {
                   Verifying...
                 </>
               ) : (
-                'Verify'
+                "Verify"
               )}
             </Button>
           </form>
@@ -148,7 +149,7 @@ function VerifyOTPContent() {
           {/* Resend OTP */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Didn't receive OTP?{' '}
+              Didn't receive OTP?{" "}
               <button
                 onClick={handleResendOtp}
                 disabled={isLoading}
@@ -161,7 +162,10 @@ function VerifyOTPContent() {
 
           {/* Back to Login */}
           <div className="mt-4 text-center">
-            <Link href="/auth/login" className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2">
+            <Link
+              href="/auth/login"
+              className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-2"
+            >
               <ArrowLeft className="w-4 h-4" />
               Back to Login
             </Link>

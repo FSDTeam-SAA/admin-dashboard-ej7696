@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Mail, Lock, Loader2 } from 'lucide-react';
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,15 +58,8 @@ export default function LoginPage() {
         <div className="p-8">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-13h4v6h-4z" />
-              </svg>
-            </div>
+            <Image src="/logo.png" alt="Logo" width={100} height={100} />
           </div>
-
-          {/* Heading */}
-          <h1 className="text-2xl font-bold text-center mb-2">Inspector's Path</h1>
           <p className="text-center text-gray-600 text-sm mb-8">Login To Your Account</p>
 
           {/* Form */}
