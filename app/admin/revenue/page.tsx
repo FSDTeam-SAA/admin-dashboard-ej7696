@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { paymentAPI } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Trash2 } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -83,6 +83,7 @@ export default function RevenuePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [range, setRange] = useState<Range>("day");
+  const pageSize = 8;
 
   // API Queries (Logic remains the same)
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery(
@@ -92,8 +93,8 @@ export default function RevenuePage() {
   );
 
   const { data: purchasesData, isLoading: isPurchasesLoading } = useQuery(
-    ["purchases", currentPage],
-    () => paymentAPI.getPurchasesList(currentPage, 10),
+    ["purchases"],
+    () => paymentAPI.getPurchasesList(1, 500),
     { keepPreviousData: true }
   );
 
@@ -119,6 +120,25 @@ export default function RevenuePage() {
       );
     });
   }, [purchases, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalFiltered = filteredPurchases.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedPurchases = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredPurchases.slice(start, start + pageSize);
+  }, [filteredPurchases, pageSize, safePage]);
 
   const formatCurrency = (value: number) =>
     `$${Number(value || 0).toFixed(2)}`;
@@ -289,7 +309,7 @@ export default function RevenuePage() {
                 </td>
               </tr>
             ) : (
-              filteredPurchases.map((p: any, i: number) => {
+              paginatedPurchases.map((p: any, i: number) => {
                 const subscription =
                   p?.purchaseType === "plan" ? "Professional" : "Starter";
                 const isActive = p?.paymentStatus === "completed";
@@ -348,6 +368,51 @@ export default function RevenuePage() {
           </tbody>
         </table>
       </div>
+
+      {!isPurchasesLoading && totalFiltered > 0 && (
+        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-white rounded-b-xl">
+          <p className="text-xs text-slate-500">
+            Showing {(safePage - 1) * pageSize + 1} to {Math.min(safePage * pageSize, totalFiltered)} of {totalFiltered} results
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
+              disabled={safePage === 1}
+              className="h-7 w-7 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {(() => {
+              const end = Math.min(totalPages, safePage + 1);
+              const start = Math.max(1, end - 2);
+              return Array.from({ length: end - start + 1 }, (_, idx) => {
+                const page = start + idx;
+                const isActive = page === safePage;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-7 w-7 rounded-md border text-xs font-semibold ${
+                      isActive
+                        ? "bg-[#254391] text-white border-[#254391]"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              });
+            })()}
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+              disabled={safePage >= totalPages}
+              className="h-7 w-7 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

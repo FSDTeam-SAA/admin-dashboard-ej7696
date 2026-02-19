@@ -30,11 +30,12 @@ type PlanCard = {
   note: string;
   status: string;
   accent: "starter" | "pro";
+  professionalPlanPrice?: number;
   editable: boolean;
 };
 
 const starterFeatures = [
-  "15 free practice questions per month",
+  "16 free practice questions per month",
   "Explore all certifications",
   "Up to 2 practice questions per certification",
   "Upgrade anytime for full access",
@@ -199,7 +200,7 @@ export default function SubscriptionsPage() {
           Exam Unlock Price
         </Button>
 
-        {plans.length > 0 && !hideAddNewPlan && (
+        {plans.professionalPlanPrice > 0 && !hideAddNewPlan && (
           <Button
             className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
             onClick={handleOpenAdd}

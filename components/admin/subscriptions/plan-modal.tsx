@@ -50,6 +50,7 @@ export function AddPlanModal({
   planData,
   isEdit = false,
 }: AddPlanModalProps) {
+  const [newItemId, setNewItemId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: planData?.name || '',
     price: planData?.price?.toString() || '',
@@ -61,6 +62,7 @@ export function AddPlanModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    setNewItemId(null);
     setFormData({
       name: planData?.name || '',
       price: planData?.price?.toString() || '',
@@ -70,6 +72,18 @@ export function AddPlanModal({
       status: planData?.status || 'Active',
     });
   }, [isOpen, planData]);
+
+  useEffect(() => {
+    if (!newItemId) return;
+    const input = document.getElementById(
+      `plan-item-${newItemId}`
+    ) as HTMLInputElement | null;
+    if (input) {
+      input.focus();
+      input.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      setNewItemId(null);
+    }
+  }, [newItemId, formData.items.length]);
 
   const toInterval = (duration: string) => {
     const value = duration?.toString().toLowerCase() || 'monthly';
@@ -115,10 +129,12 @@ export function AddPlanModal({
   );
 
   const addItem = () => {
+    const id = `${Date.now()}`;
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, { id: Date.now().toString(), text: '' }],
+      items: [...prev.items, { id, text: '' }],
     }));
+    setNewItemId(id);
   };
 
   const removeItem = (id: string) => {
@@ -245,6 +261,7 @@ export function AddPlanModal({
                     <Check className="h-3.5 w-3.5" />
                   </span>
                   <Input
+                    id={`plan-item-${item.id}`}
                     placeholder="Up to 2 practice questions per certification"
                     value={item.text}
                     onChange={(e) =>

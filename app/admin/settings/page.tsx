@@ -168,14 +168,14 @@ export default function SettingsPage() {
     setIsUpdatingModel(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/a/config-model`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/config-model`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ model_name: selectedModel }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -456,7 +456,7 @@ export default function SettingsPage() {
         onSuccess={refetch}
       />
 
-          {/* ✅ Change AI Model Modal */}
+      {/* ✅ Change AI Model Modal */}
       <Dialog
         open={isModelModalOpen}
         onOpenChange={(open) => {
@@ -483,9 +483,7 @@ export default function SettingsPage() {
                 <option value="gemini-3-flash-preview">
                   Gemini 3 Flash (Preview)
                 </option>
-                <option value="gpt-4.1-2025-04-14">
-                  gpt-4.1-2025-04-14
-                </option>
+                <option value="gpt-4.1-2025-04-14">gpt-4.1-2025-04-14</option>
               </select>
             </div>
 
