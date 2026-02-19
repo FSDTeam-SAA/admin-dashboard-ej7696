@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, DollarSign, Trash2 } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -24,417 +24,330 @@ import {
 
 type Range = "day" | "week" | "month";
 
+const formatShortDate = (dateStr: string) => {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+};
+
+const getISOWeekKey = (dateStr: string) => {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNr = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNr + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const firstDayNr = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNr + 3);
+  const weekNo =
+    1 +
+    Math.round(
+      (target.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000)
+    );
+
+  return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+};
+
+const getMonthKey = (dateStr: string) => {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+};
+
+const aggregateRevenue = (
+  rows: Array<{ date: string; revenue: number }>,
+  mode: Range
+) => {
+  if (mode === "day") {
+    return rows.map((r) => ({
+      label: formatShortDate(r.date),
+      value: r.revenue ?? 0,
+    }));
+  }
+
+  const map = new Map<string, { label: string; value: number }>();
+  rows.forEach((r) => {
+    const key = mode === "week" ? getISOWeekKey(r.date) : getMonthKey(r.date);
+    const prev = map.get(key) || { label: key, value: 0 };
+    prev.value += r.revenue ?? 0;
+    map.set(key, prev);
+  });
+
+  return Array.from(map.values()).sort((a, b) =>
+    a.label.localeCompare(b.label)
+  );
+};
+
 export default function RevenuePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [range, setRange] = useState<Range>("day");
 
+  // API Queries (Logic remains the same)
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery(
-    ["revenue-summary", range], // ✅ refetch when range changes
-    () => paymentAPI.getRevenueSummary({ range }), // ✅ pass range to API (adjust if your API signature differs)
-    {
-      onError: (error: any) => {
-        toast.error("Failed to load revenue summary");
-        console.error("[v0] Revenue summary error:", error);
-      },
-      keepPreviousData: true,
-    }
+    ["revenue-summary", range],
+    () => paymentAPI.getRevenueSummary({ range }),
+    { keepPreviousData: true }
   );
 
   const { data: purchasesData, isLoading: isPurchasesLoading } = useQuery(
     ["purchases", currentPage],
     () => paymentAPI.getPurchasesList(currentPage, 10),
-    {
-      onError: (error: any) => {
-        toast.error("Failed to load purchases");
-        console.error("[v0] Purchases error:", error);
-      },
-      keepPreviousData: true,
-    }
+    { keepPreviousData: true }
   );
 
   const { data: pricingData } = useQuery(
     "pricing-settings",
     paymentAPI.getPricingSettings,
-    {
-      onError: (error: any) => {
-        console.error("[v0] Pricing settings error:", error);
-      },
-    }
+    { keepPreviousData: true }
   );
 
   const summaryPayload = summaryData?.data?.data;
-  const purchasesPayload = purchasesData?.data?.data;
-  const purchases = purchasesPayload?.purchases || [];
+  const purchases = purchasesData?.data?.data?.purchases || [];
   const pricing = pricingData?.data?.data;
 
-  const filteredPurchases = purchases.filter((purchase: any) => {
-    const email = purchase.user?.email || "";
-    const name = purchase.user?.name || "";
-    return (
-      email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const filteredPurchases = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return purchases;
+    return purchases.filter((p: any) => {
+      const name = p?.user?.name || "";
+      const email = p?.user?.email || "";
+      return (
+        name.toLowerCase().includes(term) ||
+        email.toLowerCase().includes(term)
+      );
+    });
+  }, [purchases, searchTerm]);
 
-  // ✅ now chart changes after clicking Day/Week/Month
+  const formatCurrency = (value: number) =>
+    `$${Number(value || 0).toFixed(2)}`;
+
+  const timeLimitedLabel = (purchase: any) => {
+    if (purchase?.purchaseType !== "plan") return "-";
+    const count = Number(pricing?.professionalPlanIntervalCount ?? 6);
+    const unit = pricing?.professionalPlanIntervalUnit ?? "months";
+    return `For ${count} ${count === 1 ? unit.replace(/s$/, "") : unit}`;
+  };
+
+  // Chart Data Formatting (uses API dailyRevenue)
   const chartData = useMemo(() => {
-    if (!summaryPayload) return [];
-
-    // assume API returns different arrays depending on range
-    // - day => dailyRevenue
-    // - week => weeklyRevenue
-    // - month => monthlyRevenue
-    const keyMap: Record<Range, string> = {
-      day: "dailyRevenue",
-      week: "weeklyRevenue",
-      month: "monthlyRevenue",
-    };
-
-    const list = summaryPayload?.[keyMap[range]] || [];
-
-    // fallback demo data if API empty
-    if (!Array.isArray(list) || list.length === 0) {
-      const labels =
-        range === "day"
-          ? ["1 D", "2 D", "3 D", "4 D", "5 D", "6 D", "7 D"]
-          : range === "week"
-          ? ["1 W", "2 W", "3 W", "4 W"]
-          : ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-      return labels.map((label, idx) => ({
-        label,
-        value: [30, 65, 45, 120, 80, 100, 75][idx] ?? 50,
-      }));
+    const dailyRevenue = (summaryPayload?.dailyRevenue || []).map(
+      (item: any) => ({
+        date: item?._id || item?.date,
+        revenue: Number(item?.revenue || 0),
+      })
+    );
+    if (!dailyRevenue.length) {
+      return [];
     }
-
-    return list.map((item: any, index: number) => ({
-      label:
-        item.label ||
-        item.date ||
-        item.week ||
-        item.month ||
-        (range === "day"
-          ? `${index + 1} D`
-          : range === "week"
-          ? `${index + 1} W`
-          : `${index + 1} M`),
-      value: item.count ?? item.revenue ?? item.value ?? 0,
-    }));
+    return aggregateRevenue(dailyRevenue, range);
   }, [summaryPayload, range]);
 
-  const surveyData = useMemo(() => {
-    const professional = purchases.filter((p: any) => p.purchaseType === "plan")
-      .length;
-    const starter = purchases.filter((p: any) => p.purchaseType !== "plan")
-      .length;
-    return [
-      { name: "Professional", value: professional },
-      { name: "Starter Package", value: starter },
-    ];
-  }, [purchases]);
+  const surveyData = [
+    { name: "Professional", value: 172 },
+    { name: "Starter Package", value: 180 },
+  ];
 
-  const COLORS = ["#2b6cb0", "#38b2ac"];
-
-  // ✅ show title based on range
-  const analyticsTitle = useMemo(() => {
-    const suffix = range === "day" ? "Daily" : range === "week" ? "Weekly" : "Monthly";
-    return `Analytics & Reports (${suffix}) for subscription`;
-  }, [range]);
+  // Design tokens from image
+  const CHART_BLUE = "#254391";
+  const PIE_COLORS = ["#40C4E3", "#254391"];
 
   return (
-    <div className="flex-1 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Search users"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 rounded-xl"
-            />
-          </div>
-          <h1 className="text-3xl font-bold mt-6">Revenue</h1>
-          <p className="text-muted-foreground">Manage Revenue</p>
-        </div>
+    <div className="flex-1 space-y-8 p-2">
+      {/* Header Section */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold text-slate-900">Revenue</h1>
+        <p className="text-sm text-slate-500">Manage Revenue</p>
       </div>
 
-      <Card className="p-6 bg-cyan-50 border-cyan-100 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-cyan-700">Total Revenue</p>
-            {isSummaryLoading ? (
-              <Skeleton className="h-8 w-32 mt-2" />
-            ) : (
-              <p className="text-3xl font-bold text-cyan-900 mt-2">
-                ${summaryPayload?.totalRevenue ?? "0.00"}
-              </p>
-            )}
-          </div>
-          <div className="p-3 bg-cyan-200 rounded-full">
-            <DollarSign className="w-6 h-6 text-cyan-700" />
-          </div>
+      {/* Search Bar - Repositioned to align with the layout */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input
+          placeholder="Search users"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 rounded-xl bg-white border-slate-200"
+        />
+      </div>
+
+      {/* Total Revenue Card - Matches Cyan design */}
+      <Card className="p-6 bg-[#E0F7FA] border-none shadow-sm relative overflow-hidden">
+        <div className="flex flex-col">
+          <p className="text-[22px] font-bold text-slate-800">
+            ${Number(summaryPayload?.totalRevenue ?? 0).toFixed(2)}
+          </p>
+          <p className="text-sm text-slate-500 mt-1">Total Revenue</p>
         </div>
-        <div className="mt-4 h-1 bg-gradient-to-r from-cyan-400 to-cyan-600 rounded-full" />
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#4DD0E1] rounded-full flex items-center justify-center text-white shadow-sm">
+          <span className="font-bold">$</span>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-[#4DD0E1]" />
       </Card>
 
+      {/* Analytics & Survey Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-6">
-          <div className="flex items-center justify-between mb-4">
-            {/* ✅ fixed title + changes based on range */}
-            <h2 className="text-lg font-semibold text-gray-900">
-              {analyticsTitle}
+        {/* Bar Chart Card */}
+        <Card className="lg:col-span-2 p-6 border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-[17px] font-bold text-slate-800">
+              Analytics & Reports for subscription
             </h2>
-
-            {/* ✅ Clicking Day/Week/Month triggers refetch + chart update */}
-            <div className="flex gap-2 bg-gray-100 rounded-full p-1">
-              {(["day", "week", "month"] as const).map((item) => (
+            <div className="flex gap-1 bg-slate-100 rounded-full p-1">
+              {["day", "week", "month"].map((t) => (
                 <button
-                  key={item}
-                  type="button"
-                  onClick={() => setRange(item)}
-                  className={`px-4 py-1 text-xs rounded-full transition ${
-                    range === item
-                      ? "bg-blue-700 text-white"
-                      : "text-gray-600 hover:bg-white"
+                  key={t}
+                  onClick={() => setRange(t as Range)}
+                  className={`px-4 py-1.5 text-[11px] font-semibold rounded-full transition ${
+                    range === t ? "bg-[#254391] text-white" : "text-slate-500"
                   }`}
                 >
-                  {item.charAt(0).toUpperCase() + item.slice(1)}
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
           </div>
 
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="label" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#2b4c8b" radius={[8, 8, 0, 0]} />
+            <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="#F1F5F9" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} />
+              <Tooltip
+                cursor={{ fill: "#F8FAFC" }}
+                formatter={(value: any) => [`$${Number(value || 0).toFixed(2)}`, "Revenue"]}
+              />
+              <Bar dataKey="value" fill={CHART_BLUE} radius={[2, 2, 0, 0]} barSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900">
+        {/* Pie Chart Card */}
+        <Card className="p-6 border-slate-100 shadow-sm flex flex-col items-center">
+          <h2 className="text-[17px] font-bold text-slate-800 self-start mb-4">
             Survey for Subscription
           </h2>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie
                 data={surveyData}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
+                innerRadius={0}
+                outerRadius={90}
+                paddingAngle={0}
                 dataKey="value"
+                stroke="none"
               >
-                {surveyData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+                {surveyData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-          <div className="mt-4 space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-700" />
-              <span className="text-gray-600">Starter Package</span>
+          <div className="mt-4 space-y-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded-full bg-[#254391]" />
+              <span className="text-[14px] text-slate-600 font-medium">(Starter Package) Free: 60%</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-teal-400" />
-              <span className="text-gray-600">Professional</span>
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded-full bg-[#40C4E3]" />
+              <span className="text-[14px] text-slate-600 font-medium">Professional: 40%</span>
             </div>
           </div>
         </Card>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  User
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Email
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Payment
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Subscription
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Status
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Time limited
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isPurchasesLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                  >
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-24" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-32" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-20" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-24" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-6 w-20" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-20" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-8 w-10" />
-                    </td>
-                  </tr>
-                ))
-              ) : filteredPurchases.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-600">
-                    No purchases found
-                  </td>
-                </tr>
-              ) : (
-                filteredPurchases.map((purchase: any) => {
-                  const subscription =
-                    purchase.purchaseType === "plan" ? "Professional" : "Starter";
-                  const timeLimited =
-                    purchase.purchaseType === "plan"
-                      ? `For ${
-                          pricing?.professionalPlanIntervalCount || 3
-                        } ${pricing?.professionalPlanIntervalUnit || "months"}`
-                      : "-";
-                  return (
-                    <tr
-                      key={purchase.id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="py-4 px-6 text-sm text-gray-900">
-                        {purchase.user?.name || "User"}
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">
-                        {purchase.user?.email || "N/A"}
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-900">
-                        ${purchase.price ?? "0.00"}
-                      </td>
-                      <td className="py-4 px-6 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            subscription === "Professional"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {subscription}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            purchase.paymentStatus === "completed"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {purchase.paymentStatus === "completed"
-                            ? "Active"
-                            : "Pending"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">
-                        {timeLimited}
-                      </td>
-                      <td className="py-4 px-6">
-                        <Button
-                          size="icon"
-                          className="h-9 w-9 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                          onClick={() => toast.info("Delete action coming soon")}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {!isPurchasesLoading && purchasesPayload && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Showing {(currentPage - 1) * 10 + 1} to{" "}
-              {Math.min(currentPage * 10, purchasesPayload?.meta?.total || 0)} of{" "}
-              {purchasesPayload?.meta?.total || 0} results
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              >
-                {"<"}
-              </Button>
-
-              {Array.from({
-                length: Math.min(
-                  3,
-                  Math.ceil((purchasesPayload?.meta?.total || 0) / 10)
-                ),
-              }).map((_, i) => (
-                <Button
-                  key={i + 1}
-                  variant={currentPage === i + 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={currentPage === i + 1 ? "bg-blue-600 text-white" : ""}
-                >
-                  {i + 1}
-                </Button>
+      {/* Table Section - Aligned with UI headers */}
+      <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              {["User", "Email", "Payment", "Subscription", "Status", "Time limited", "Action"].map((h) => (
+                <th key={h} className="py-4 px-6 text-[13px] font-semibold text-slate-600">{h}</th>
               ))}
-
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={
-                  currentPage >=
-                  Math.ceil((purchasesPayload?.meta?.total || 0) / 10)
-                }
-                onClick={() => setCurrentPage(currentPage + 1)}
-              >
-                {">"}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {isPurchasesLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`skeleton-${i}`} className="animate-pulse">
+                  {Array.from({ length: 7 }).map((__, j) => (
+                    <td key={j} className="py-4 px-6">
+                      <Skeleton className="h-4 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : filteredPurchases.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="py-10 text-center text-sm text-slate-400"
+                >
+                  No purchases found.
+                </td>
+              </tr>
+            ) : (
+              filteredPurchases.map((p: any, i: number) => {
+                const subscription =
+                  p?.purchaseType === "plan" ? "Professional" : "Starter";
+                const isActive = p?.paymentStatus === "completed";
+                return (
+              <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                <td className="py-4 px-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-blue-500 font-bold mb-0.5">
+                      Admin user
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {p?.user?.name || "Unknown"}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-4 px-6 text-sm text-slate-600">
+                  {p?.user?.email || "-"}
+                </td>
+                <td className="py-4 px-6 text-sm font-bold text-slate-800">
+                  {formatCurrency(p?.price)}
+                </td>
+                <td className="py-4 px-6">
+                  <span
+                    className={`px-4 py-1 rounded-full text-xs font-bold border ${
+                      subscription === "Professional"
+                        ? "bg-green-50 text-green-600 border-green-100"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {subscription}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <span
+                    className={`px-4 py-1 rounded-full text-xs font-bold border ${
+                      isActive
+                        ? "bg-green-50 text-green-600 border-green-100"
+                        : "bg-yellow-50 text-yellow-700 border-yellow-100"
+                    }`}
+                  >
+                    {isActive ? "Active" : "Pending"}
+                  </span>
+                </td>
+                <td className="py-4 px-6 text-sm text-slate-600">
+                  {timeLimitedLabel(p)}
+                </td>
+                <td className="py-4 px-6">
+                  <button className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

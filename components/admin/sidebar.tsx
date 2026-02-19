@@ -15,6 +15,7 @@ import {
   X,
   Star,
   Headset,
+  CreditCard,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ const menuItems = [
   { icon: Users, label: 'User Management', href: '/admin/users' },
   { icon: TrendingUp, label: 'Revenue', href: '/admin/revenue' },
   { icon: Star, label: 'Review', href: '/admin/review' }, // ✅ updated
+  { icon: CreditCard, label: 'Subscriptions', href: '/admin/subscriptions' }, // ✅ updated
   { icon: Bell, label: 'Announcement', href: '/admin/announcements' },
   { icon: Headset, label: 'Support', href: '/admin/support' }, // ✅ updated
   { icon: Settings, label: 'Settings', href: '/admin/settings' },

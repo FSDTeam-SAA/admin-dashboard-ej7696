@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from 'react-query';
 import { toast } from 'sonner';
 import {
@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, X, Plus } from 'lucide-react';
+import { Loader2, X, Plus, Check } from 'lucide-react';
+import { paymentAPI } from '@/lib/api';
 
 interface PlanItem {
   id: string;
@@ -58,11 +59,46 @@ export function AddPlanModal({
     status: planData?.status || 'Active',
   });
 
-  const [newItem, setNewItem] = useState('');
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      name: planData?.name || '',
+      price: planData?.price?.toString() || '',
+      duration: planData?.duration || 'Monthly',
+      items: planData?.items || [{ id: '1', text: '' }],
+      note: planData?.note || '',
+      status: planData?.status || 'Active',
+    });
+  }, [isOpen, planData]);
+
+  const toInterval = (duration: string) => {
+    const value = duration?.toString().toLowerCase() || 'monthly';
+    if (value.includes('year')) {
+      return { count: 1, unit: 'years' };
+    }
+    if (value.includes('quarter') || value.includes('3')) {
+      return { count: 3, unit: 'months' };
+    }
+    return { count: 1, unit: 'months' };
+  };
 
   const { mutate: savePlan, isLoading } = useMutation(
     async () => {
-      throw new Error('Subscription plan management is not supported by the current backend.');
+      const price = Number(formData.price);
+      const features = formData.items
+        .map((item) => item.text?.toString().trim())
+        .filter(Boolean);
+      const { count, unit } = toInterval(formData.duration);
+
+      return paymentAPI.updatePricing({
+        professionalPlanPrice: price,
+        professionalPlanIntervalCount: count,
+        professionalPlanIntervalUnit: unit,
+        professionalPlanDescription:
+          formData.note?.toString().trim() || "What's included in your plan",
+        professionalPlanFeatures: features,
+        currency: 'USD',
+      });
     },
     {
       onSuccess: () => {
@@ -73,24 +109,16 @@ export function AddPlanModal({
         onClose();
       },
       onError: (error: any) => {
-        toast.error(
-          error?.response?.data?.message || 'Failed to save plan'
-        );
+        toast.error(error?.response?.data?.message || 'Failed to save plan');
       },
     }
   );
 
   const addItem = () => {
-    if (newItem.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        items: [
-          ...prev.items,
-          { id: Date.now().toString(), text: newItem },
-        ],
-      }));
-      setNewItem('');
-    }
+    setFormData((prev) => ({
+      ...prev,
+      items: [...prev.items, { id: Date.now().toString(), text: '' }],
+    }));
   };
 
   const removeItem = (id: string) => {
@@ -109,25 +137,35 @@ export function AddPlanModal({
     }));
   };
 
+  const priceValue = Number(formData.price);
   const isFormValid =
     formData.name &&
-    formData.price &&
+    Number.isFinite(priceValue) &&
+    priceValue > 0 &&
+    formData.note &&
     formData.items.length > 0 &&
     formData.items.every((item) => item.text.trim());
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="max-w-[640px] rounded-2xl bg-white p-6">
+        <DialogHeader className="text-center">
+          <DialogTitle className="text-lg font-semibold text-slate-900">
             {isEdit ? 'Edit Plan' : 'Add New Plan'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="name">Plan Name</Label>
+              <Label htmlFor="name" className="text-xs font-semibold text-slate-500">
+                Plan Name
+              </Label>
               <Input
                 id="name"
                 placeholder="Starter"
@@ -135,12 +173,15 @@ export function AddPlanModal({
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                className="mt-2 h-10 rounded-lg border-slate-200"
               />
             </div>
             <div>
-              <Label htmlFor="price">Plan Price</Label>
-              <div className="flex items-center">
-                <span className="mr-2 text-lg">$</span>
+              <Label htmlFor="price" className="text-xs font-semibold text-slate-500">
+                Plan Price
+              </Label>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-500">$</span>
                 <Input
                   id="price"
                   type="number"
@@ -149,24 +190,27 @@ export function AddPlanModal({
                   onChange={(e) =>
                     setFormData({ ...formData, price: e.target.value })
                   }
+                  className="h-10 rounded-lg border-slate-200"
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="duration">Plan Duration</Label>
+              <Label htmlFor="duration" className="text-xs font-semibold text-slate-500">
+                Plan Duration
+              </Label>
               <Select
                 value={formData.duration}
                 onValueChange={(value) =>
                   setFormData({ ...formData, duration: value })
                 }
               >
-                <SelectTrigger id="duration">
+                <SelectTrigger id="duration" className="mt-2 h-10 rounded-lg border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className='bg-white'>
                   <SelectItem value="Monthly">Monthly</SelectItem>
                   <SelectItem value="Quarterly">Quarterly</SelectItem>
                   <SelectItem value="Yearly">Yearly</SelectItem>
@@ -174,7 +218,9 @@ export function AddPlanModal({
               </Select>
             </div>
             <div>
-              <Label htmlFor="note">Plan Note</Label>
+              <Label htmlFor="note" className="text-xs font-semibold text-slate-500">
+                Plan Note
+              </Label>
               <Input
                 id="note"
                 placeholder="Add a short note"
@@ -182,28 +228,34 @@ export function AddPlanModal({
                 onChange={(e) =>
                   setFormData({ ...formData, note: e.target.value })
                 }
+                className="mt-2 h-10 rounded-lg border-slate-200"
               />
             </div>
           </div>
 
-          {/* Plan Items */}
           <div className="space-y-3">
-            <Label>Plan Items</Label>
+            <Label className="text-xs font-semibold text-slate-500">Plan Items</Label>
             <div className="space-y-2">
               {formData.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <span className="text-green-600">✓</span>
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-600">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
                   <Input
                     placeholder="Up to 2 practice questions per certification"
                     value={item.text}
                     onChange={(e) =>
                       updateItemText(item.id, e.target.value)
                     }
-                    className="flex-1"
+                    className="h-9 flex-1 border-none px-0 shadow-none focus-visible:ring-0"
                   />
                   <button
+                    type="button"
                     onClick={() => removeItem(item.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
+                    className="rounded-full p-1 text-slate-400 transition hover:text-red-600"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -211,37 +263,32 @@ export function AddPlanModal({
               ))}
             </div>
 
-            {/* Add New Item */}
-            <div className="flex gap-2 pt-2">
-              <Input
-                placeholder="Enter new plan item..."
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    addItem();
-                  }
-                }}
-              />
+            <div className="flex justify-end pt-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={addItem}
-                className="px-3 bg-transparent"
+                className="h-9 rounded-full border-slate-300 px-4 text-xs"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" />
+                Add More
               </Button>
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="h-10 rounded-full border-slate-300 px-6"
+            >
               Cancel
             </Button>
             <Button
               onClick={() => savePlan()}
               disabled={!isFormValid || isLoading}
-              className="ml-auto"
+              className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
             >
               {isLoading ? (
                 <>

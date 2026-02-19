@@ -92,8 +92,10 @@ export const userAPI = {
 // ============ DASHBOARD APIs ============
 
 export const dashboardAPI = {
-  getOverview: () =>
-    axiosInstance.get('/api/v1/admin/dashboard'),
+  getOverview: (params?: { page?: number; limit?: number; range?: string }) => {
+    const query = buildQueryString(params ?? {});
+    return axiosInstance.get(`/api/v1/admin/dashboard${query}`);
+  },
 };
 
 // ============ EXAM APIs ============

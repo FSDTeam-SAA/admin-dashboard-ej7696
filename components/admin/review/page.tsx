@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "react-query";
 import { reviewAPI } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -25,12 +25,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  Search,
   Star,
   Trash2,
-  Pencil,
-  CheckCircle,
-  XCircle,
+  User,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Upload,
+  Send,
+  Edit,
 } from "lucide-react";
 
 type ReviewItem = {
@@ -52,533 +55,627 @@ type ReviewItem = {
 const normalizeStatus = (value?: string) =>
   value === "published" ? "published" : "pending";
 
-const formatDate = (value?: string) => {
-  if (!value) return "N/A";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "N/A" : parsed.toLocaleDateString();
+const getReviewId = (review: ReviewItem) => review.reviewId || review._id || "";
+
+const defaultCreateForm = {
+  displayName: "",
+  feedbackText: "",
+  stars: 4,
+  image: null as File | null,
 };
 
 export default function ReviewPage() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [createForm, setCreateForm] = useState(defaultCreateForm);
   const [editForm, setEditForm] = useState({
-    status: "pending",
-    stars: 5,
-    feedbackText: "",
     displayName: "",
+    feedbackText: "",
+    stars: 4,
   });
 
-  const pageSize = 10;
-  const normalizedStatus =
-    statusFilter === "all" ? undefined : statusFilter.toLowerCase();
+  // Page size 9 works best for a 3-column grid (3 rows of 3)
+  const pageSize = 9;
 
-  const {
-    data: reviewsData,
-    isLoading,
-    refetch,
-  } = useQuery(
-    ["admin-reviews", currentPage, normalizedStatus],
-    () =>
-      reviewAPI.listAdminReviews(currentPage, pageSize, {
-        status: normalizedStatus,
-      }),
-    {
-      onError: (error: any) => {
-        toast.error("Failed to load reviews");
-        console.error("[v0] Reviews error:", error);
-      },
-    },
+  const { data: reviewsData, isLoading, refetch } = useQuery(
+    ["admin-reviews", currentPage, pageSize],
+    () => reviewAPI.listAdminReviews(currentPage, pageSize),
+    { onError: () => toast.error("Failed to load reviews") }
   );
 
   const reviewsPayload = reviewsData?.data?.data;
   const reviews: ReviewItem[] = reviewsPayload?.reviews || [];
-
-  const filteredReviews = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return reviews;
-    return reviews.filter((review) => {
-      const userName =
-        review.displayName || review.userName || review.userEmail || "";
-      const examName = review.examName || "";
-      const feedbackText = review.feedbackText || "";
-      return (
-        userName.toLowerCase().includes(term) ||
-        examName.toLowerCase().includes(term) ||
-        feedbackText.toLowerCase().includes(term) ||
-        (review.userEmail || "").toLowerCase().includes(term)
-      );
-    });
-  }, [reviews, searchTerm]);
-
   const totalCount = reviewsPayload?.meta?.total || 0;
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const resultEnd = Math.min(currentPage * pageSize, totalCount);
 
-  const openEditDialog = (review: ReviewItem) => {
-    setSelectedReview(review);
-    setEditForm({
-      status: normalizeStatus(review.status),
-      stars: review.stars || 5,
-      feedbackText: review.feedbackText || "",
-      displayName: review.displayName || review.userName || "",
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleToggleStatus = async (review: ReviewItem) => {
-    const reviewId = review.reviewId || review._id;
-    if (!reviewId) return;
-    const nextStatus =
-      normalizeStatus(review.status) === "published" ? "pending" : "published";
-
-    setPendingActionId(reviewId);
-    try {
-      await reviewAPI.updateReview(reviewId, { status: nextStatus });
-      toast.success(
-        `Review ${nextStatus === "published" ? "published" : "unpublished"}`,
-      );
-      refetch();
-    } catch (error: any) {
-      console.error("[v0] Update review status error:", error);
-      toast.error("Failed to update review status");
-    } finally {
-      setPendingActionId(null);
-    }
-  };
-
-  const handleSaveEdit = async () => {
+  useEffect(() => {
     if (!selectedReview) return;
-    const reviewId = selectedReview.reviewId || selectedReview._id;
-    if (!reviewId) return;
-
-    setIsSaving(true);
-    try {
-      await reviewAPI.updateReview(reviewId, {
-        status: editForm.status,
-        stars: editForm.stars,
-        feedbackText: editForm.feedbackText,
-        displayName: editForm.displayName,
-      });
-      toast.success("Review updated");
-      setIsEditDialogOpen(false);
+    const selectedId = getReviewId(selectedReview);
+    const stillExists = reviews.some((r) => getReviewId(r) === selectedId);
+    if (!stillExists) {
       setSelectedReview(null);
+    }
+  }, [reviews, selectedReview]);
+
+  const handlePostReview = async () => {
+    if (!selectedReview) return;
+    const id = getReviewId(selectedReview);
+    if (!id) return;
+
+    if (normalizeStatus(selectedReview.status) === "published") {
+      toast.info("Testimonial is already posted");
+      setIsPostDialogOpen(false);
+      return;
+    }
+
+    setIsPosting(true);
+    try {
+      await reviewAPI.updateReview(id, { status: "published" });
+      toast.success("Testimonial posted");
+      setIsPostDialogOpen(false);
       refetch();
-    } catch (error: any) {
-      console.error("[v0] Update review error:", error);
-      toast.error(error.response?.data?.message || "Failed to update review");
+    } catch {
+      toast.error("Failed to post testimonial");
     } finally {
-      setIsSaving(false);
+      setIsPosting(false);
     }
   };
 
   const handleDeleteReview = async () => {
     if (!selectedReview) return;
-    const reviewId = selectedReview.reviewId || selectedReview._id;
-    if (!reviewId) return;
+    const id = getReviewId(selectedReview);
+    if (!id) return;
 
     setIsDeleting(true);
     try {
-      await reviewAPI.deleteReview(reviewId);
-      toast.success("Review deleted");
+      await reviewAPI.deleteReview(id);
+      toast.success("Testimonial deleted");
       setIsDeleteDialogOpen(false);
       setSelectedReview(null);
       refetch();
-    } catch (error: any) {
-      console.error("[v0] Delete review error:", error);
-      toast.error("Failed to delete review");
+    } catch {
+      toast.error("Delete failed");
     } finally {
       setIsDeleting(false);
     }
   };
 
+  const handleCreateTestimonial = async () => {
+    if (!createForm.displayName.trim() || !createForm.feedbackText.trim()) {
+      toast.error("Please fill in name and testimonial");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      toast.success("Testimonial created");
+      setIsCreateDialogOpen(false);
+      setCreateForm(defaultCreateForm);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleOpenEdit = () => {
+    if (!selectedReview) return;
+    setEditForm({
+      displayName: selectedReview.displayName || selectedReview.userName || "",
+      feedbackText: selectedReview.feedbackText || "",
+      stars: selectedReview.stars || 4,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedReview) return;
+    const id = getReviewId(selectedReview);
+    if (!id) return;
+
+    if (!editForm.displayName.trim() || !editForm.feedbackText.trim()) {
+      toast.error("Please fill in name and testimonial");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await reviewAPI.updateReview(id, {
+        displayName: editForm.displayName,
+        feedbackText: editForm.feedbackText,
+        stars: editForm.stars,
+      });
+      toast.success("Testimonial updated");
+      setIsEditDialogOpen(false);
+      refetch();
+    } catch {
+      toast.error("Update failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const selectedId = selectedReview ? getReviewId(selectedReview) : "";
+  const hasSelection = Boolean(selectedId);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Review Management
-            </h1>
-            <p className="text-gray-500 mt-1 text-sm">Dashboard &gt; Review</p>
-          </div>
+    <div className=" space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Receiving Testimonials
+          </h1>
+          <p className="text-sm text-slate-500">
+            Manage User Receiving Testimonials
+          </p>
         </div>
-
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Search by user, exam, or text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 rounded-xl"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="published">Published</option>
-            </select>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {hasSelection && (
+            <>
+              <Button
+                className="h-10 rounded-full bg-red-500 px-6 text-white hover:bg-red-600"
+                onClick={() => setIsDeleteDialogOpen(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+              <Button
+                className="h-10 rounded-full bg-green-600 px-6 text-white hover:bg-green-700"
+                onClick={() => setIsPostDialogOpen(true)}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Post
+              </Button>
+              <Button
+                className="h-10 rounded-full bg-green-600 px-6 text-white hover:bg-green-700"
+                onClick={handleOpenEdit}
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            </>
+          )}
+          <Button
+            className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1E40AF]"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create
+          </Button>
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  User
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Exam
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Rating
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Feedback
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Status
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Updated
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-28" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-24" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-16" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-48" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-6 w-20" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-4 w-20" />
-                    </td>
-                    <td className="py-4 px-6">
-                      <Skeleton className="h-8 w-24" />
-                    </td>
-                  </tr>
-                ))
-              ) : filteredReviews.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-600">
-                    No reviews found
-                  </td>
-                </tr>
-              ) : (
-                filteredReviews.map((review) => {
-                  const reviewId = review.reviewId || review._id || "";
-                  const status = normalizeStatus(review.status);
-                  const rating = review.stars || 0;
-                  const displayName =
-                    review.userName ||
-                    review.displayName ||
-                    review.userEmail ||
-                    "Unknown";
-                  return (
-                    <tr
-                      key={reviewId}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="py-4 px-6">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900">
-                            {displayName}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {review.userEmail || "—"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">
-                        {review.examName || "Exam"}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-4 h-4 ${
-                                i < rating
-                                  ? "fill-yellow-400 text-yellow-400"
-                                  : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-600 max-w-[260px]">
-                        <span
-                          className="block truncate"
-                          title={review.feedbackText || ""}
-                        >
-                          {review.feedbackText || "—"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            status === "published"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-orange-100 text-orange-700"
-                          }`}
-                        >
-                          {status === "published" ? "Published" : "Pending"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-600">
-                        {formatDate(review.updatedAt || review.createdAt)}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={`gap-1 ${
-                              status === "published"
-                                ? "border-orange-200 text-orange-700 hover:bg-orange-50"
-                                : "border-green-200 text-green-700 hover:bg-green-50"
-                            }`}
-                            onClick={() => handleToggleStatus(review)}
-                            disabled={pendingActionId === reviewId}
-                          >
-                            {status === "published" ? (
-                              <>
-                                <XCircle className="w-4 h-4" /> Unpublish
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4" /> Publish
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8 rounded-full border-blue-200 text-blue-700 hover:bg-blue-50"
-                            onClick={() => openEditDialog(review)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8 rounded-full border-red-200 text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              setSelectedReview(review);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {!isLoading && reviewsPayload && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Showing {resultStart} to {resultEnd} of {totalCount} results
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              >
-                {"<"}
-              </Button>
-              {Array.from({ length: Math.min(3, totalPages) }).map((_, i) => (
-                <Button
-                  key={i + 1}
-                  variant={currentPage === i + 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={
-                    currentPage === i + 1 ? "bg-blue-600 text-white" : ""
-                  }
-                >
-                  {i + 1}
-                </Button>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage(currentPage + 1)}
-              >
-                {">"}
-              </Button>
-            </div>
+      {/* 3-Column Grid */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <Card
+              key={i}
+              className="rounded-2xl border border-slate-100 bg-white p-6"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  {Array.from({ length: 5 }).map((__, starIdx) => (
+                    <Skeleton key={starIdx} className="h-3 w-3 rounded-full" />
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </Card>
+          ))
+        ) : reviews.length === 0 ? (
+          <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white py-20 text-center text-slate-400">
+            No testimonials found.
           </div>
-        </Card>
+        ) : (
+          reviews.map((review, index) => {
+            const id = getReviewId(review);
+            const cardKey = id || `review-${index}`;
+            const isSelected = id && id === selectedId;
+            const name = review.displayName || review.userName || "Guest";
+            const subline = review.userEmail || review.examName || "Unknown";
+            const rating = review.stars || 0;
+
+            return (
+              <Card
+                key={cardKey}
+                className={`rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:shadow-md ${
+                  isSelected
+                    ? "border-green-500 bg-[#E7F7EC] ring-1 ring-green-200"
+                    : "border-slate-200"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedReview(review)}
+                  className="w-full text-left"
+                  aria-pressed={isSelected}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                          <User className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-800">
+                            {name}
+                          </h3>
+                          <p className="text-xs text-slate-500">{subline}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: 5 }).map((_, starIdx) => (
+                          <Star
+                            key={starIdx}
+                            className={`h-3.5 w-3.5 ${
+                              starIdx < rating
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-slate-200"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="mt-4 min-h-[80px] text-sm italic leading-relaxed text-slate-600 line-clamp-4">
+                      "{review.feedbackText || "No feedback text provided."}"
+                    </p>
+                  </div>
+                </button>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Pagination */}
+      {!isLoading && totalCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 shadow-sm">
+          <p className="text-sm text-slate-500">
+            Showing{" "}
+            <span className="font-semibold text-slate-900">
+              {(currentPage - 1) * pageSize + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-semibold text-slate-900">
+              {Math.min(currentPage * pageSize, totalCount)}
+            </span>{" "}
+            of {totalCount} testimonials
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-lg border-slate-200"
+              disabled={currentPage === 1}
+              onClick={() => {
+                setCurrentPage((p) => p - 1);
+                setSelectedReview(null);
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {Array.from({ length: totalPages }).map((_, i) => {
+              const pageNum = i + 1;
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    className={`h-9 w-9 rounded-lg ${
+                      currentPage === pageNum ? "bg-[#1E3A8A] text-white" : ""
+                    }`}
+                    onClick={() => {
+                      setCurrentPage(pageNum);
+                      setSelectedReview(null);
+                    }}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              }
+              return null;
+            })}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-lg border-slate-200"
+              disabled={currentPage === totalPages}
+              onClick={() => {
+                setCurrentPage((p) => p + 1);
+                setSelectedReview(null);
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       )}
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-lg bg-white">
-          <DialogHeader>
-            <DialogTitle>Edit Review</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">Status</p>
-              <select
-                value={editForm.status}
-                onChange={(e) =>
-                  setEditForm((prev) => ({ ...prev, status: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="pending">Pending</option>
-                <option value="published">Published</option>
-              </select>
-            </div>
+      {/* Post Confirmation */}
+      <AlertDialog open={isPostDialogOpen} onOpenChange={setIsPostDialogOpen}>
+        <AlertDialogContent className="max-w-md rounded-2xl border-none bg-white p-6">
+          <AlertDialogHeader className="text-center">
+            <AlertDialogTitle className="text-xl font-semibold text-slate-900">
+              Are you sure?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-500">
+              Are you sure you want to Share this on your Landing page?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <AlertDialogCancel className="rounded-full border border-slate-200 px-6">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePostReview}
+              className="rounded-full bg-blue-600 px-6 text-white hover:bg-blue-700"
+              disabled={isPosting}
+            >
+              {isPosting ? "Sharing..." : "Share"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent className="max-w-md rounded-2xl border-none bg-white p-6">
+          <AlertDialogHeader className="text-center">
+            <AlertDialogTitle className="text-xl font-semibold text-slate-900">
+              Are you sure?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-500">
+              Are you sure you want to Delete the Testimonial.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <AlertDialogCancel className="rounded-full border border-slate-200 px-6">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteReview}
+              className="rounded-full bg-red-500 px-6 text-white hover:bg-red-600"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Testimonial */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6">
+          <DialogHeader>
+            <DialogTitle className="text-center text-lg font-semibold text-slate-900">
+              Create New Testimonial
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">Rating</p>
-              <div className="flex gap-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() =>
-                      setEditForm((prev) => ({ ...prev, stars: i + 1 }))
-                    }
-                    className="p-1"
-                  >
-                    <Star
-                      className={`w-6 h-6 ${
-                        i < editForm.stars
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-slate-300"
-                      }`}
-                    />
-                  </button>
-                ))}
+              <label className="text-xs font-semibold text-slate-500">
+                Rate 1 to 5 stars
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                {Array.from({ length: 5 }).map((_, idx) => {
+                  const rating = idx + 1;
+                  return (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() =>
+                        setCreateForm((p) => ({ ...p, stars: rating }))
+                      }
+                      className="leading-none"
+                    >
+                      <Star
+                        className={`h-5 w-5 ${
+                          rating <= createForm.stars
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-300"
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">
-                Display Name
-              </p>
+              <label className="text-xs font-semibold text-slate-500">
+                Your Name
+              </label>
               <Input
-                value={editForm.displayName}
+                value={createForm.displayName}
                 onChange={(e) =>
-                  setEditForm((prev) => ({
-                    ...prev,
+                  setCreateForm((p) => ({
+                    ...p,
                     displayName: e.target.value,
                   }))
                 }
-                placeholder="Reviewer name"
+                placeholder="Butlar Mane"
+                className="mt-2 rounded-xl border-slate-200"
               />
             </div>
-
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">
-                Feedback
-              </p>
+              <label className="text-xs font-semibold text-slate-500">
+                Your Testimonial
+              </label>
               <Textarea
-                value={editForm.feedbackText}
+                value={createForm.feedbackText}
                 onChange={(e) =>
-                  setEditForm((prev) => ({
-                    ...prev,
+                  setCreateForm((p) => ({
+                    ...p,
                     feedbackText: e.target.value,
                   }))
                 }
-                placeholder="Feedback text"
-                rows={4}
+                placeholder="e.g. This platform was a game-changer for my exam preparation."
+                className="mt-2 min-h-[110px] rounded-xl border-slate-200"
               />
             </div>
-
-            <div className="flex gap-3 pt-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500">
+                Upload an image as logo
+              </label>
+              <div className="mt-3 flex items-center gap-3">
+                <label
+                  htmlFor="testimonial-logo"
+                  className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                >
+                  <Upload className="h-4 w-4" />
+                </label>
+                <input
+                  id="testimonial-logo"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) =>
+                    setCreateForm((p) => ({
+                      ...p,
+                      image: e.target.files?.[0] || null,
+                    }))
+                  }
+                />
+                <span className="text-xs text-slate-400">
+                  {createForm.image ? createForm.image.name : "No file selected"}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
               <Button
-                type="button"
                 variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
+                className="flex-1 rounded-full border-slate-200"
+                onClick={() => setIsCreateDialogOpen(false)}
               >
                 Cancel
               </Button>
               <Button
-                type="button"
-                className="ml-auto bg-blue-700 hover:bg-blue-800 text-white"
-                onClick={handleSaveEdit}
-                disabled={isSaving}
+                className="flex-1 rounded-full bg-[#1E3A8A] text-white hover:bg-[#1E40AF]"
+                onClick={handleCreateTestimonial}
+                disabled={isCreating}
               >
-                {isSaving ? "Saving..." : "Save"}
+                {isCreating ? "Creating..." : "Create"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent className="bg-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This review will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-3 justify-end">
-            <AlertDialogCancel className="rounded-lg">No</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteReview}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Yes, Delete"}
-            </AlertDialogAction>
+      {/* Edit Testimonial */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6">
+          <DialogHeader>
+            <DialogTitle className="text-center text-lg font-semibold text-slate-900">
+              Update Testimonial
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500">
+                Rate 1 to 5 stars
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                {Array.from({ length: 5 }).map((_, idx) => {
+                  const rating = idx + 1;
+                  return (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() =>
+                        setEditForm((p) => ({ ...p, stars: rating }))
+                      }
+                      className="leading-none"
+                    >
+                      <Star
+                        className={`h-5 w-5 ${
+                          rating <= editForm.stars
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-300"
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500">
+                Your Name
+              </label>
+              <Input
+                value={editForm.displayName}
+                onChange={(e) =>
+                  setEditForm((p) => ({
+                    ...p,
+                    displayName: e.target.value,
+                  }))
+                }
+                placeholder="Butlar Mane"
+                className="mt-2 rounded-xl border-slate-200"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500">
+                Your Testimonial
+              </label>
+              <Textarea
+                value={editForm.feedbackText}
+                onChange={(e) =>
+                  setEditForm((p) => ({
+                    ...p,
+                    feedbackText: e.target.value,
+                  }))
+                }
+                placeholder="e.g. This platform was a game-changer for my exam preparation."
+                className="mt-2 min-h-[110px] rounded-xl border-slate-200"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-full border-slate-200"
+                onClick={() => setIsEditDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 rounded-full bg-[#1E3A8A] text-white hover:bg-[#1E40AF]"
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+              >
+                {isSaving ? "Updating..." : "Update"}
+              </Button>
+            </div>
           </div>
-        </AlertDialogContent>
-      </AlertDialog>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
