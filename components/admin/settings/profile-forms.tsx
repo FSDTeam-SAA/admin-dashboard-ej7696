@@ -233,6 +233,7 @@ export function UpdateProfileModal({
     () => {
       const payload = new FormData();
       if (formData.fullName) payload.append('name', formData.fullName);
+      if (formData.email) payload.append('email', formData.email);
       if (formData.phone) payload.append('phone', formData.phone);
       if (formData.gender) payload.append('gender', formData.gender);
       if (formData.dateOfBirth) payload.append('dob', formData.dateOfBirth);

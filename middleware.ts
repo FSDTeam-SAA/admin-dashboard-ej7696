@@ -6,10 +6,11 @@ export async function middleware(req: NextRequest) {
   const session = await auth();
   const pathname = req.nextUrl.pathname;
   const role = (session?.role || session?.user?.role || '').toString().toLowerCase();
+  const isAuthValid = Boolean(session?.accessToken) && !session?.error;
 
   // Protect admin routes
   if (pathname.startsWith('/admin')) {
-    if (!session || !session.accessToken) {
+    if (!isAuthValid) {
       return NextResponse.redirect(new URL('/auth/login', req.url));
     }
 
@@ -20,7 +21,7 @@ export async function middleware(req: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (pathname.startsWith('/auth')) {
-    if (session) {
+    if (isAuthValid) {
       return NextResponse.redirect(new URL('/admin', req.url));
     }
   }

@@ -51,6 +51,9 @@ const refreshAccessToken = async (token: any) => {
     console.error(' Refresh token error:', error);
     return {
       ...token,
+      accessToken: undefined,
+      accessTokenExpires: 0,
+      refreshToken: undefined,
       error: 'RefreshAccessTokenError',
     };
   }

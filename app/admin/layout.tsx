@@ -13,7 +13,7 @@ export const metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
-  if (!session) {
+  if (!session || !session.accessToken || session.error) {
     redirect('/auth/login');
   }
 

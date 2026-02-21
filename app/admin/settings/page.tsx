@@ -115,11 +115,16 @@ export default function SettingsPage() {
       toast.error("Full name is required");
       return;
     }
+    if (!profileForm.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
 
     setIsSaving(true);
     try {
       const payload = new FormData();
       payload.append("name", profileForm.fullName);
+      payload.append("email", profileForm.email.trim());
       if (profileForm.phone) payload.append("phone", profileForm.phone);
       if (profileForm.gender) payload.append("gender", profileForm.gender);
       if (profileForm.dateOfBirth)
@@ -336,7 +341,13 @@ export default function SettingsPage() {
             ) : (
               <Input
                 value={profileForm.email}
-                readOnly
+                type="email"
+                onChange={(e) =>
+                  setProfileForm((prev) => ({
+                    ...prev,
+                    email: e.target.value,
+                  }))
+                }
                 className="mt-2 h-11 rounded-lg border-[#1E3A8A]"
                 placeholder="Emmanuel.Zibili123@gmail.com"
               />
@@ -364,50 +375,6 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-600">Gender</label>
-            {isLoading ? (
-              <Skeleton className="mt-2 h-11 w-full" />
-            ) : (
-              <select
-                value={profileForm.gender}
-                onChange={(e) =>
-                  setProfileForm((prev) => ({
-                    ...prev,
-                    gender: e.target.value,
-                  }))
-                }
-                className="mt-2 h-11 w-full rounded-lg border border-[#1E3A8A] bg-white px-3 text-sm focus:outline-none"
-              >
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-600">
-              date of Birth
-            </label>
-            {isLoading ? (
-              <Skeleton className="mt-2 h-11 w-full" />
-            ) : (
-              <Input
-                type="date"
-                value={profileForm.dateOfBirth}
-                onChange={(e) =>
-                  setProfileForm((prev) => ({
-                    ...prev,
-                    dateOfBirth: e.target.value,
-                  }))
-                }
-                className="mt-2 h-11 rounded-lg border-[#1E3A8A]"
-                placeholder="Set your Birthday"
-              />
-            )}
-          </div>
 
           <div>
             <label className="text-sm font-medium text-slate-600">

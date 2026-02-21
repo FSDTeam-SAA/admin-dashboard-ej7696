@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000';
 const trimmedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
@@ -18,6 +18,7 @@ const axiosInstance = axios.create({
 type RetriableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
 
 let refreshSessionPromise: Promise<Awaited<ReturnType<typeof getSession>>> | null = null;
+let isSigningOut = false;
 
 const getRefreshedSession = async () => {
   if (!refreshSessionPromise) {
@@ -56,7 +57,7 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       const session = await getRefreshedSession();
-      if (session?.accessToken) {
+      if (session?.accessToken && !session?.error) {
         originalRequest.headers = {
           ...originalRequest.headers,
           Authorization: `Bearer ${session.accessToken}`,
@@ -68,7 +69,12 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       // Handle unauthorized access
       if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
+        if (!isSigningOut) {
+          isSigningOut = true;
+          await signOut({ redirect: true, callbackUrl: '/auth/login' });
+        } else {
+          window.location.href = '/auth/login';
+        }
       }
     }
 
