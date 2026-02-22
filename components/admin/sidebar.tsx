@@ -72,7 +72,6 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
             className="mb-2"
             priority
           />
-          <p className="text-sm font-semibold text-slate-600">{userName}</p>
         </div>
 
         {/* Navigation */}
