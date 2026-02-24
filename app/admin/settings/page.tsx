@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useQuery } from "react-query";
+import { useMutation, useQuery, useQueryClient } from "react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,42 @@ const AI_MODEL_OPTIONS = [
   },
 ];
 
+const getCurrentModelRequest = async () => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/model-name`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to load current AI model");
+  }
+
+  const payload: ModelNameResponse = await response.json();
+  const modelName = typeof payload?.text === "string" ? payload.text.trim() : "";
+  if (!modelName) {
+    throw new Error("Current AI model not found");
+  }
+
+  return modelName;
+};
+
+const updateModelRequest = async (modelName: string) => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/config-model`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model_name: modelName }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to update AI model");
+  }
+
+  return response;
+};
+
 const normalizeDate = (value: string) => {
   if (!value) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -74,10 +110,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
-  const [isUpdatingModel, setIsUpdatingModel] = useState(false);
-  const [isLoadingCurrentModel, setIsLoadingCurrentModel] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AI_MODEL_OPTIONS[0].value);
   const [currentModel, setCurrentModel] = useState("");
+  const queryClient = useQueryClient();
 
   const {
     data: profileData,
@@ -86,6 +121,36 @@ export default function SettingsPage() {
   } = useQuery("admin-profile", api.getProfile, {
     onError: () => toast.error("Failed to load profile"),
   });
+
+  const {
+    refetch: refetchCurrentModel,
+    isFetching: isLoadingCurrentModel,
+  } = useQuery(["current-ai-model"], getCurrentModelRequest, {
+    enabled: false,
+    retry: 1,
+    onSuccess: (modelName) => {
+      setCurrentModel(modelName);
+      setSelectedModel(modelName);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to load current AI model");
+    },
+  });
+
+  const updateModelMutation = useMutation(updateModelRequest, {
+    onSuccess: (_, modelName) => {
+      setCurrentModel(modelName);
+      setSelectedModel(modelName);
+      queryClient.setQueryData(["current-ai-model"], modelName);
+      toast.success("AI model updated successfully");
+      setIsModelModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update AI model");
+    },
+  });
+
+  const isUpdatingModel = updateModelMutation.isLoading;
 
   const profileInfo = useMemo(() => {
     const payload = profileData?.data?.data ?? profileData?.data ?? {};
@@ -189,41 +254,10 @@ export default function SettingsPage() {
     ];
   }, [currentModel]);
 
-  const fetchCurrentModel = async () => {
-    setIsLoadingCurrentModel(true);
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/model-name`,
-        {
-          method: "GET",
-        },
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to load current AI model");
-      }
-
-      const payload: ModelNameResponse = await response.json();
-      const modelName = typeof payload?.text === "string" ? payload.text.trim() : "";
-
-      if (!modelName) {
-        throw new Error("Current AI model not found");
-      }
-
-      setCurrentModel(modelName);
-      setSelectedModel(modelName);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to load current AI model");
-    } finally {
-      setIsLoadingCurrentModel(false);
-    }
-  };
-
   // AI model modal handlers
   const openModelModal = () => {
     setIsModelModalOpen(true);
-    void fetchCurrentModel();
+    void refetchCurrentModel();
   };
 
   const closeModelModal = () => {
@@ -231,7 +265,7 @@ export default function SettingsPage() {
     setIsModelModalOpen(false);
   };
 
-  const handleUpdateModel = async (event: FormEvent) => {
+  const handleUpdateModel = (event: FormEvent) => {
     event.preventDefault();
 
     if (!selectedModel) {
@@ -239,32 +273,7 @@ export default function SettingsPage() {
       return;
     }
 
-    setIsUpdatingModel(true);
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/config-model`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ model_name: selectedModel }),
-        },
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to update AI model");
-      }
-
-      toast.success("AI model updated successfully");
-      setCurrentModel(selectedModel);
-      setIsModelModalOpen(false);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update AI model");
-    } finally {
-      setIsUpdatingModel(false);
-    }
+    updateModelMutation.mutate(selectedModel);
   };
 
   const avatarFallback = profileForm.fullName
