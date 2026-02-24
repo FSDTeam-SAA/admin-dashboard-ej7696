@@ -136,7 +136,7 @@ export default function SubscriptionsPage() {
         id: "starter",
         name: "Starter Plan",
         price: 0,
-        duration: "6 months",
+        duration: "",
         items: starterFeatures.map((text, index) => ({
           id: `starter-${index}`,
           text,

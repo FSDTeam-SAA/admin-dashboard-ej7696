@@ -35,6 +35,27 @@ const emptyProfile: ProfileForm = {
   address: "",
 };
 
+type ModelNameResponse = {
+  status?: boolean;
+  status_code?: number;
+  text?: string;
+};
+
+const AI_MODEL_OPTIONS = [
+  {
+    value: "gemini-3-flash-preview",
+    label: "Gemini 3 Flash (Preview)",
+  },
+  {
+    value: "gpt-4.1-2025-04-14",
+    label: "gpt-4.1-2025-04-14",
+  },
+  {
+    value: "gpt-4o-mini-2024-07-18",
+    label: "gpt-4o-mini-2024-07-18",
+  },
+];
+
 const normalizeDate = (value: string) => {
   if (!value) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -54,7 +75,9 @@ export default function SettingsPage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [isUpdatingModel, setIsUpdatingModel] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gemini-3-flash-preview");
+  const [isLoadingCurrentModel, setIsLoadingCurrentModel] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(AI_MODEL_OPTIONS[0].value);
+  const [currentModel, setCurrentModel] = useState("");
 
   const {
     data: profileData,
@@ -152,9 +175,55 @@ export default function SettingsPage() {
     setAvatarUrl(profileInfo.avatar || "");
   };
 
-  // ✅ AI model modal handlers
+  const modelOptions = useMemo(() => {
+    if (!currentModel) return AI_MODEL_OPTIONS;
+    const exists = AI_MODEL_OPTIONS.some((option) => option.value === currentModel);
+    if (exists) return AI_MODEL_OPTIONS;
+
+    return [
+      {
+        value: currentModel,
+        label: `${currentModel} (Current)`,
+      },
+      ...AI_MODEL_OPTIONS,
+    ];
+  }, [currentModel]);
+
+  const fetchCurrentModel = async () => {
+    setIsLoadingCurrentModel(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/model-name`,
+        {
+          method: "GET",
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to load current AI model");
+      }
+
+      const payload: ModelNameResponse = await response.json();
+      const modelName = typeof payload?.text === "string" ? payload.text.trim() : "";
+
+      if (!modelName) {
+        throw new Error("Current AI model not found");
+      }
+
+      setCurrentModel(modelName);
+      setSelectedModel(modelName);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load current AI model");
+    } finally {
+      setIsLoadingCurrentModel(false);
+    }
+  };
+
+  // AI model modal handlers
   const openModelModal = () => {
     setIsModelModalOpen(true);
+    void fetchCurrentModel();
   };
 
   const closeModelModal = () => {
@@ -189,6 +258,7 @@ export default function SettingsPage() {
       }
 
       toast.success("AI model updated successfully");
+      setCurrentModel(selectedModel);
       setIsModelModalOpen(false);
     } catch (error: any) {
       toast.error(error?.message || "Failed to update AI model");
@@ -441,16 +511,23 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-gray-700">
                 Select Model
               </label>
+              <p className="text-xs text-gray-500">
+                Previous model:{" "}
+                {isLoadingCurrentModel
+                  ? "Loading..."
+                  : currentModel || "Not available"}
+              </p>
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                disabled={isUpdatingModel}
+                disabled={isUpdatingModel || isLoadingCurrentModel}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="gemini-3-flash-preview">
-                  Gemini 3 Flash (Preview)
-                </option>
-                <option value="gpt-4.1-2025-04-14">gpt-4.1-2025-04-14</option>
+                {modelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -463,11 +540,11 @@ export default function SettingsPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isUpdatingModel}>
-                {isUpdatingModel ? (
+              <Button type="submit" disabled={isUpdatingModel || isLoadingCurrentModel}>
+                {isUpdatingModel || isLoadingCurrentModel ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
+                    {isLoadingCurrentModel ? "Loading..." : "Updating..."}
                   </>
                 ) : (
                   "Update Model"

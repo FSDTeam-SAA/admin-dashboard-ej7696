@@ -227,9 +227,7 @@ export function AddPlanModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className='bg-white'>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
                   <SelectItem value="Quarterly">Quarterly</SelectItem>
-                  <SelectItem value="Yearly">Yearly</SelectItem>
                 </SelectContent>
               </Select>
             </div>
