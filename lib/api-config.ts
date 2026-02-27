@@ -50,6 +50,9 @@ export const API_ENDPOINTS = {
     DELETE_EXAM: '/api/v1/exam/:examId',
     START_EXAM: '/api/v1/exam/:examId/start',
     SUBMIT_EXAM: '/api/v1/exam/:examId/submit',
+    GET_QUESTION_BANK_STATUS: '/api/v1/exam/:examId/question-bank/status',
+    GET_QUESTION_BANK_QUESTIONS: '/api/v1/exam/:examId/question-bank/questions',
+    GENERATE_QUESTION_BANK: '/api/v1/exam/:examId/question-bank/generate',
   },
 
   // ============ PAYMENTS & REVENUE ============

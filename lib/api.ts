@@ -10,6 +10,8 @@ const buildQueryString = (params: Record<string, string | number | undefined>) =
   return query ? `?${query}` : '';
 };
 
+const QUESTION_BANK_GENERATE_TIMEOUT_MS = 10 * 60 * 1000;
+
 // ============ AUTH APIs ============
 
 export const authAPI = {
@@ -128,6 +130,30 @@ export const examAPI = {
 
   submitExam: (examId: string, data: { answers: string[]; flaggedQuestionIds: string[]; timeSpent: number[] }) =>
     axiosInstance.post(`/api/v1/exam/${examId}/submit`, data),
+
+  getQuestionBankStatus: (examId: string) =>
+    axiosInstance.get(`/api/v1/exam/${examId}/question-bank/status`),
+
+  getQuestionBankQuestions: (
+    examId: string,
+    params?: { page?: number; limit?: number; search?: string }
+  ) => {
+    const query = buildQueryString(params ?? {});
+    return axiosInstance.get(`/api/v1/exam/${examId}/question-bank/questions${query}`);
+  },
+
+  generateQuestionBank: (
+    examId: string,
+    data: {
+      targetCount?: number;
+      batchSize?: number;
+      maxBatchesPerRun?: number;
+      exam_type?: string;
+    }
+  ) =>
+    axiosInstance.post(`/api/v1/exam/${examId}/question-bank/generate`, data, {
+      timeout: QUESTION_BANK_GENERATE_TIMEOUT_MS,
+    }),
 };
 
 // ============ PAYMENT APIs ============
@@ -311,8 +337,9 @@ const updateUserComposite = async (userId: string, data: any) => {
       subadmin: 'sub-admin',
       admin: 'admin',
     };
-    finalRole = roleMap[normalizedRole] || normalizedRole;
-    await authAPI.updateUserRole(userId, { role: finalRole });
+    const resolvedRole = roleMap[normalizedRole] || normalizedRole;
+    finalRole = resolvedRole;
+    await authAPI.updateUserRole(userId, { role: resolvedRole });
   }
 
   if (data?.subscriptionTier) {

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Database } from 'lucide-react';
 import Image from 'next/image';
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AddExamModal } from '@/components/admin/exams/add-exam-modal';
+import { QuestionBankModal } from '@/components/admin/exams/question-bank-modal';
 
 export default function ExamManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,6 +30,8 @@ export default function ExamManagementPage() {
   const [selectedExam, setSelectedExam] = useState<any | null>(null);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isQuestionBankModalOpen, setIsQuestionBankModalOpen] = useState(false);
+  const [selectedQuestionBankExam, setSelectedQuestionBankExam] = useState<any | null>(null);
 
   const { data: examsData, isLoading, refetch } = useQuery(
     ['exams', currentPage],
@@ -72,6 +75,11 @@ export default function ExamManagementPage() {
     setSelectedExam(exam);
     setExamModalMode('edit');
     setIsExamModalOpen(true);
+  };
+
+  const openQuestionBank = (exam: any) => {
+    setSelectedQuestionBankExam(exam);
+    setIsQuestionBankModalOpen(true);
   };
 
   return (
@@ -167,7 +175,16 @@ export default function ExamManagementPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 md:flex-none bg-transparent"
+                    onClick={() => openQuestionBank(exam)}
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    Question Bank
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -247,6 +264,15 @@ export default function ExamManagementPage() {
           setIsExamModalOpen(false);
           setSelectedExam(null);
           refetch();
+        }}
+      />
+
+      <QuestionBankModal
+        isOpen={isQuestionBankModalOpen}
+        exam={selectedQuestionBankExam}
+        onClose={() => {
+          setIsQuestionBankModalOpen(false);
+          setSelectedQuestionBankExam(null);
         }}
       />
 
