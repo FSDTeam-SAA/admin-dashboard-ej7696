@@ -1,0 +1,27 @@
+﻿Question Bank (Simple Overview)
+
+1. You choose how many final questions you want.
+- Example: Target = 50, Batch Size = 10.
+- System understands this means 5 batches.
+
+2. The system generates questions in small groups.
+- It does not create all questions at once.
+
+3. Every generated question is checked automatically.
+- Repeated questions are removed.
+- Bad/invalid questions are rejected.
+- Only good questions are approved.
+
+4. Approved questions are saved in your Question Bank.
+- Users get questions from this saved bank.
+- This avoids calling AI every time a user starts an exam.
+
+5. You can refresh anytime to see real numbers.
+- Approved in Final Bank = usable questions.
+- Total Stored = questions currently saved for this exam content.
+
+6. If exam content changes, a new bank can be generated.
+- New questions are created for the updated content.
+
+In short:
+Generate -> Auto check -> Remove duplicates -> Save approved -> Serve users from database.

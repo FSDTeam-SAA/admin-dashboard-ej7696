@@ -67,6 +67,7 @@ export function ManageUserModal({
     tempPassword: "",
   });
   const [initialUnlockedExamIds, setInitialUnlockedExamIds] = useState<string[]>([]);
+  const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
 
   const { data: examsData, isLoading: isExamsLoading } = useQuery(
     ["admin-exams-all"],
@@ -119,6 +120,7 @@ export function ManageUserModal({
       : [];
 
     setInitialUnlockedExamIds(unlockedExamIds);
+    setPasswordChangeRequired(Boolean(user.mustChangePassword));
     setFormData({
       phone: user.phone || "",
       fullName: name,
@@ -172,7 +174,8 @@ export function ManageUserModal({
     },
     {
       onSuccess: () => {
-        toast.success("Temporary password set");
+        toast.success("Temporary password set. User will be prompted to change it on next login.");
+        setPasswordChangeRequired(true);
         setFormData((prev) => ({ ...prev, tempPassword: "" }));
       },
       onError: (error: any) => {
@@ -200,6 +203,30 @@ export function ManageUserModal({
         : [...prev.unlockedExams, examId],
     }));
   };
+
+  const formatDateTime = (value?: string | Date | null) => {
+    if (!value) return "N/A";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "N/A";
+    return parsed.toLocaleString();
+  };
+
+  const userUnlockedExams = Array.isArray(user?.unlockedExams) ? user.unlockedExams : [];
+  const paidExamPurchases = userUnlockedExams.filter(
+    (item: any) => item?.purchaseType === "exam" && item?.paymentStatus === "completed",
+  ).length;
+  const planPurchases = userUnlockedExams.filter(
+    (item: any) => item?.purchaseType === "plan" && item?.paymentStatus === "completed",
+  ).length;
+  const manualUnlocks = userUnlockedExams.filter(
+    (item: any) => item?.purchaseType === "manual",
+  ).length;
+  const latestPurchaseAt = userUnlockedExams
+    .map((item: any) => item?.purchasedAt)
+    .filter(Boolean)
+    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const normalizedTier = (user?.subscriptionTier || "starter").toString().toLowerCase();
+  const isProfessional = normalizedTier === "professional";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -277,6 +304,57 @@ export function ManageUserModal({
                   <SelectItem value="Professional">Professional</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Billing & Subscription Summary */}
+          <div className="space-y-3">
+            <Label className="text-slate-700 font-bold">Billing &amp; Subscription Summary</Label>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Signed up</p>
+                  <p className="font-semibold text-slate-800">{formatDateTime(user?.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Current plan</p>
+                  <p className="font-semibold text-slate-800">
+                    {isProfessional ? "Professional" : "Starter"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Plan started</p>
+                  <p className="font-semibold text-slate-800">
+                    {isProfessional
+                      ? formatDateTime(user?.subscriptionStartedAt)
+                      : "N/A (Starter plan)"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Plan expires</p>
+                  <p className="font-semibold text-slate-800">
+                    {isProfessional
+                      ? formatDateTime(user?.subscriptionExpiresAt)
+                      : "N/A (Starter plan)"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Plan purchases (completed)</p>
+                  <p className="font-semibold text-slate-800">{planPurchases}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Exam purchases (completed)</p>
+                  <p className="font-semibold text-slate-800">{paidExamPurchases}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Manual unlocks</p>
+                  <p className="font-semibold text-slate-800">{manualUnlocks}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Latest billing activity</p>
+                  <p className="font-semibold text-slate-800">{formatDateTime(latestPurchaseAt)}</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -411,6 +489,12 @@ export function ManageUserModal({
           {/* Credential Management */}
           <div className="space-y-3">
             <Label className="text-slate-700 font-bold">Credential Management</Label>
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <span className="text-slate-500">Password update required on next login:</span>{" "}
+              <span className={`font-semibold ${passwordChangeRequired ? "text-amber-600" : "text-emerald-600"}`}>
+                {passwordChangeRequired ? "Yes" : "No"}
+              </span>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Input
                 placeholder="Enter a temporary Password...."

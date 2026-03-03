@@ -35,10 +35,19 @@ export default function LoginPage() {
       } else if (result?.ok) {
         const session = await getSession();
         const role = (session?.role || session?.user?.role || '').toString().toLowerCase();
+        const mustChangePassword = Boolean(
+          (session as any)?.mustChangePassword ||
+            (session as any)?.user?.mustChangePassword
+        );
         if (!['admin', 'sub-admin', 'vendor'].includes(role)) {
           await signOut({ redirect: false });
           toast.error('You are not authorized for admin access');
           router.push('/unauthorized');
+          return;
+        }
+        if (mustChangePassword) {
+          toast.warning('Temporary password detected. Please set a new password now.');
+          router.push('/admin/settings?forcePasswordChange=1');
           return;
         }
         toast.success('Login successful!');

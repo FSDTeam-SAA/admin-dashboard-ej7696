@@ -88,6 +88,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
               accessToken: payload.accessToken,
               refreshToken: payload.refreshToken,
               role: payload.role,
+              mustChangePassword: Boolean(payload.mustChangePassword ?? payload.user?.mustChangePassword),
               user: payload.user ?? payload,
             };
           }
@@ -108,6 +109,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.refreshToken = user.refreshToken;
         token.role = user.role;
         token.userId = user.id;
+        token.mustChangePassword = user.mustChangePassword;
         token.user = user.user;
         token.accessTokenExpires = getTokenExpiry(user.accessToken);
         return token;
@@ -130,6 +132,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         session.refreshToken = token.refreshToken as string;
         session.role = token.role as string;
         session.userId = token.userId as string;
+        session.mustChangePassword = Boolean(token.mustChangePassword);
         session.user = token.user as any;
         session.error = token.error as string | undefined;
       }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ const normalizeDate = (value: string) => {
 };
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfile);
   const [initialProfile, setInitialProfile] =
     useState<ProfileForm>(emptyProfile);
@@ -110,6 +112,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
+  const [hasShownForcePasswordPrompt, setHasShownForcePasswordPrompt] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AI_MODEL_OPTIONS[0].value);
   const [currentModel, setCurrentModel] = useState("");
   const queryClient = useQueryClient();
@@ -197,6 +200,15 @@ export default function SettingsPage() {
     });
     setAvatarUrl(profileInfo.avatar);
   }, [profileData, profileInfo]);
+
+  useEffect(() => {
+    const shouldForceChangePassword = searchParams.get("forcePasswordChange") === "1";
+    if (!shouldForceChangePassword || hasShownForcePasswordPrompt) return;
+
+    setIsPasswordModalOpen(true);
+    toast.warning("Please update your password before continuing.");
+    setHasShownForcePasswordPrompt(true);
+  }, [searchParams, hasShownForcePasswordPrompt]);
 
   const handleSaveProfile = async () => {
     if (!profileForm.fullName.trim()) {
