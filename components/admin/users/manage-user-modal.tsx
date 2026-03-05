@@ -67,6 +67,7 @@ export function ManageUserModal({
     tempPassword: "",
   });
   const [initialUnlockedExamIds, setInitialUnlockedExamIds] = useState<string[]>([]);
+  const [initialManualUnlockedExamIds, setInitialManualUnlockedExamIds] = useState<string[]>([]);
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
 
   const { data: examsData, isLoading: isExamsLoading } = useQuery(
@@ -118,8 +119,15 @@ export function ManageUserModal({
           .map((e: any) => e?.examId?.toString?.() || e?.examId)
           .filter(Boolean)
       : [];
+    const manualUnlockedExamIds = Array.isArray(user.unlockedExams)
+      ? user.unlockedExams
+          .filter((e: any) => e?.purchaseType === "manual")
+          .map((e: any) => e?.examId?.toString?.() || e?.examId)
+          .filter(Boolean)
+      : [];
 
     setInitialUnlockedExamIds(unlockedExamIds);
+    setInitialManualUnlockedExamIds(manualUnlockedExamIds);
     setPasswordChangeRequired(Boolean(user.mustChangePassword));
     setFormData({
       phone: user.phone || "",
@@ -144,11 +152,22 @@ export function ManageUserModal({
       const newUnlocks = formData.unlockedExams.filter(
         (examId) => !initialUnlockedExamIds.includes(examId),
       );
+      const lockedManualExamIds = initialManualUnlockedExamIds.filter(
+        (examId) => !formData.unlockedExams.includes(examId),
+      );
 
       if (newUnlocks.length) {
         await Promise.all(
           newUnlocks.map((examId) =>
             paymentAPI.unlockExamForUser(examId, { userId }),
+          ),
+        );
+      }
+
+      if (lockedManualExamIds.length) {
+        await Promise.all(
+          lockedManualExamIds.map((examId) =>
+            paymentAPI.lockExamForUser(examId, { userId }),
           ),
         );
       }
@@ -195,12 +214,14 @@ export function ManageUserModal({
     }));
   };
 
-  const toggleExam = (examId: string) => {
+  const toggleExam = (examId: string, isChecked: boolean) => {
     setFormData((prev) => ({
       ...prev,
-      unlockedExams: prev.unlockedExams.includes(examId)
-        ? prev.unlockedExams.filter((e) => e !== examId)
-        : [...prev.unlockedExams, examId],
+      unlockedExams: isChecked
+        ? prev.unlockedExams.includes(examId)
+          ? prev.unlockedExams
+          : [...prev.unlockedExams, examId]
+        : prev.unlockedExams.filter((e) => e !== examId),
     }));
   };
 
@@ -212,6 +233,13 @@ export function ManageUserModal({
   };
 
   const userUnlockedExams = Array.isArray(user?.unlockedExams) ? user.unlockedExams : [];
+  const unlockSourceByExamId = userUnlockedExams.reduce((acc: Record<string, string>, item: any) => {
+    const examId = item?.examId?.toString?.() || item?.examId;
+    if (examId && item?.purchaseType) {
+      acc[examId] = item.purchaseType;
+    }
+    return acc;
+  }, {});
   const paidExamPurchases = userUnlockedExams.filter(
     (item: any) => item?.purchaseType === "exam" && item?.paymentStatus === "completed",
   ).length;
@@ -392,21 +420,31 @@ export function ManageUserModal({
                 <p className="text-sm text-gray-500">No exams found</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {examItems.map((exam: any) => (
-                    <div key={exam._id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={exam._id}
-                        checked={formData.unlockedExams.includes(exam._id)}
-                        onCheckedChange={() => toggleExam(exam._id)}
-                      />
-                      <Label
-                        htmlFor={exam._id}
-                        className="text-sm cursor-pointer"
-                      >
-                        {exam.name}
-                      </Label>
-                    </div>
-                  ))}
+                  {examItems.map((exam: any) => {
+                    const purchaseType = unlockSourceByExamId[exam._id];
+                    const isNonManualUnlock = Boolean(
+                      formData.unlockedExams.includes(exam._id) &&
+                      purchaseType &&
+                      purchaseType !== "manual",
+                    );
+
+                    return (
+                      <div key={exam._id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={exam._id}
+                          checked={formData.unlockedExams.includes(exam._id)}
+                          disabled={isNonManualUnlock}
+                          onCheckedChange={(checked) => toggleExam(exam._id, checked === true)}
+                        />
+                        <Label
+                          htmlFor={exam._id}
+                          className={`text-sm cursor-pointer ${isNonManualUnlock ? "text-slate-400" : ""}`}
+                        >
+                          {exam.name}
+                        </Label>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -189,6 +189,9 @@ export const paymentAPI = {
   unlockExamForUser: (examId: string, data: { userId: string }) =>
     axiosInstance.post(`/api/v1/payments/admin/exam/${examId}/unlock`, data),
 
+  lockExamForUser: (examId: string, data: { userId: string }) =>
+    axiosInstance.post(`/api/v1/payments/admin/exam/${examId}/lock`, data),
+
   updatePricing: (data: {
     examUnlockPrice: number;
     professionalPlanPrice: number;

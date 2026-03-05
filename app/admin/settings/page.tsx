@@ -44,16 +44,8 @@ type ModelNameResponse = {
 
 const AI_MODEL_OPTIONS = [
   {
-    value: "gemini-3-flash-preview",
-    label: "Gemini 3 Flash (Preview)",
-  },
-  {
     value: "gpt-4.1-2025-04-14",
     label: "gpt-4.1-2025-04-14",
-  },
-  {
-    value: "gpt-4o-mini-2024-07-18",
-    label: "gpt-4o-mini-2024-07-18",
   },
 ];
 

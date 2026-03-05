@@ -61,6 +61,7 @@ export const API_ENDPOINTS = {
     GET_REVENUE_SUMMARY: '/api/v1/payments/admin/summary',
     GET_PURCHASES_LIST: '/api/v1/payments/admin/purchases',
     UNLOCK_EXAM_FOR_USER: '/api/v1/payments/admin/exam/:examId/unlock',
+    LOCK_EXAM_FOR_USER: '/api/v1/payments/admin/exam/:examId/lock',
   },
 
   // ============ ANNOUNCEMENTS ============
