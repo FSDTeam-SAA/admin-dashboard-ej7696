@@ -11,6 +11,8 @@ const apiBaseUrl = trimmedBaseUrl.endsWith('/api/v1')
 const loginUrl = `${apiBaseUrl}/api/v1/auth/login`;
 const refreshUrl = `${apiBaseUrl}/api/v1/auth/refresh-token`;
 
+console.log("LLLLLL", loginUrl)
+
 const decodeJwtPayload = (token: string) => {
   try {
     const payload = token.split('.')[1];
@@ -110,6 +112,8 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           );
 
           const payload = response.data?.data ?? response.data;
+
+          console.log("AAAAAAAAA", payload)
 
           if (payload?.accessToken) {
             return {
