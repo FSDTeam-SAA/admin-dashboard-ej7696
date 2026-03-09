@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { authAPI } from '@/lib/api';
+import { authAPI, userAPI } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -42,13 +42,29 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
     setIsLoading(true);
 
     try {
-      await authAPI.register({
+      const response = await authAPI.register({
         name: formData.fullName,
         email: formData.email,
         phone: formData.phone || undefined,
         password: formData.password,
         confirmPassword: formData.password,
       });
+
+      const createdUserId =
+        response.data?.data?._id ||
+        response.data?.data?.user?._id ||
+        response.data?._id ||
+        response.data?.user?._id;
+
+      if (createdUserId) {
+        try {
+          await userAPI.clearInstallationSession(createdUserId);
+        } catch (clearError) {
+          console.error('[v0] Clear user installation session error:', clearError);
+          toast.warning('User created, but the installation session could not be cleared');
+        }
+      }
+
       toast.success('User created successfully');
       setFormData({
         fullName: '',

@@ -69,6 +69,9 @@ export const userAPI = {
   getUserDetails: (userId: string) =>
     axiosInstance.get(`/api/v1/user/${userId}`),
 
+  clearInstallationSession: (userId: string) =>
+    axiosInstance.delete(`/api/v1/user/${userId}/installation-session`),
+
   getUserExamReviews: (userId: string) =>
     axiosInstance.get(`/api/v1/user/${userId}/exam-reviews`),
 

@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import Image from "next/image";
+import { getOrCreateInstallationId } from '@/lib/installation-id';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,9 +25,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      const installationId = getOrCreateInstallationId();
       const result = await signIn('credentials', {
         email,
         password,
+        installationId,
         redirect: false,
       });
 

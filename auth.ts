@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import axios from 'axios';
+import { INSTALLATION_ID_HEADER, normalizeInstallationId } from '@/lib/installation-id';
 
 const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000';
 const trimmedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
@@ -31,9 +32,23 @@ const getTokenExpiry = (token: string) => {
 
 const refreshAccessToken = async (token: any) => {
   try {
-    const response = await axios.post(refreshUrl, {
-      refreshToken: token.refreshToken,
-    });
+    const installationId = normalizeInstallationId(token.installationId);
+    if (!installationId) {
+      throw new Error('Installation identifier is required');
+    }
+
+    const response = await axios.post(
+      refreshUrl,
+      {
+        refreshToken: token.refreshToken,
+        installationId,
+      },
+      {
+        headers: {
+          [INSTALLATION_ID_HEADER]: installationId,
+        },
+      }
+    );
     const payload = response.data?.data ?? response.data;
 
     if (!payload?.accessToken) {
@@ -45,6 +60,7 @@ const refreshAccessToken = async (token: any) => {
       accessToken: payload.accessToken,
       refreshToken: payload.refreshToken ?? token.refreshToken,
       accessTokenExpires: getTokenExpiry(payload.accessToken) ?? token.accessTokenExpires,
+      installationId,
       error: undefined,
     };
   } catch (error) {
@@ -66,6 +82,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        installationId: { label: 'Installation ID', type: 'text' },
       },
       async authorize(credentials) {
         try {
@@ -73,10 +90,24 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             throw new Error('Email and password required');
           }
 
-          const response = await axios.post(loginUrl, {
-            email: credentials.email,
-            password: credentials.password,
-          });
+          const installationId = normalizeInstallationId(credentials.installationId);
+          if (!installationId) {
+            throw new Error('Installation identifier is required');
+          }
+
+          const response = await axios.post(
+            loginUrl,
+            {
+              email: credentials.email,
+              password: credentials.password,
+              installationId,
+            },
+            {
+              headers: {
+                [INSTALLATION_ID_HEADER]: installationId,
+              },
+            }
+          );
 
           const payload = response.data?.data ?? response.data;
 
@@ -89,6 +120,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
               refreshToken: payload.refreshToken,
               role: payload.role,
               mustChangePassword: Boolean(payload.mustChangePassword ?? payload.user?.mustChangePassword),
+              installationId,
               user: payload.user ?? payload,
             };
           }
@@ -110,6 +142,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.role = user.role;
         token.userId = user.id;
         token.mustChangePassword = user.mustChangePassword;
+        token.installationId = user.installationId;
         token.user = user.user;
         token.accessTokenExpires = getTokenExpiry(user.accessToken);
         return token;
@@ -133,6 +166,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         session.role = token.role as string;
         session.userId = token.userId as string;
         session.mustChangePassword = Boolean(token.mustChangePassword);
+        session.installationId = token.installationId as string;
         session.user = token.user as any;
         session.error = token.error as string | undefined;
       }

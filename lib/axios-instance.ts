@@ -1,11 +1,10 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { getSession, signOut } from 'next-auth/react';
+import { getOrCreateInstallationId, INSTALLATION_ID_HEADER } from './installation-id';
 
-const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000';
-const trimmedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
-const baseURL = trimmedBaseUrl.endsWith('/api/v1')
-  ? trimmedBaseUrl.slice(0, -'/api/v1'.length)
-  : trimmedBaseUrl;
+const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+const trimmedBaseUrl = rawBaseUrl;
+const baseURL = trimmedBaseUrl
 
 const axiosInstance = axios.create({
   baseURL,
@@ -20,6 +19,26 @@ type RetriableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
 let refreshSessionPromise: Promise<Awaited<ReturnType<typeof getSession>>> | null = null;
 let isSigningOut = false;
 
+const setHeader = (
+  headers: AxiosRequestConfig['headers'] | undefined,
+  headerName: string,
+  headerValue: string
+) => {
+  if (!headerValue) {
+    return headers;
+  }
+
+  if (headers && typeof (headers as { set?: (name: string, value: string) => void }).set === 'function') {
+    (headers as { set: (name: string, value: string) => void }).set(headerName, headerValue);
+    return headers;
+  }
+
+  return {
+    ...(headers ?? {}),
+    [headerName]: headerValue,
+  };
+};
+
 const getRefreshedSession = async () => {
   if (!refreshSessionPromise) {
     refreshSessionPromise = getSession({ broadcast: false }).finally(() => {
@@ -33,9 +52,14 @@ const getRefreshedSession = async () => {
 axiosInstance.interceptors.request.use(
   async (config) => {
     try {
+      const installationId = getOrCreateInstallationId();
+      if (installationId) {
+        config.headers = setHeader(config.headers, INSTALLATION_ID_HEADER, installationId);
+      }
+
       const session = await getSession({ broadcast: false });
       if (session?.accessToken) {
-        config.headers.Authorization = `Bearer ${session.accessToken}`;
+        config.headers = setHeader(config.headers, 'Authorization', `Bearer ${session.accessToken}`);
       }
     } catch (error) {
       console.error('[v0] Error getting session:', error);
@@ -58,10 +82,11 @@ axiosInstance.interceptors.response.use(
 
       const session = await getRefreshedSession();
       if (session?.accessToken && !session?.error) {
-        originalRequest.headers = {
-          ...originalRequest.headers,
-          Authorization: `Bearer ${session.accessToken}`,
-        };
+        originalRequest.headers = setHeader(
+          originalRequest.headers,
+          'Authorization',
+          `Bearer ${session.accessToken}`
+        );
         return axiosInstance(originalRequest);
       }
     }
