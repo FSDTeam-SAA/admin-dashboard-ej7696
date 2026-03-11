@@ -16,6 +16,11 @@ import {
   Star,
   Headset,
   CreditCard,
+  Gift,
+  Layers,
+  LibraryBig,
+  MessageSquareQuote,
+  Receipt,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -27,10 +32,15 @@ const menuItems = [
   { icon: BookOpen, label: 'Exam Content', href: '/admin/exams' },
   { icon: Users, label: 'User Management', href: '/admin/users' },
   { icon: TrendingUp, label: 'Revenue', href: '/admin/revenue' },
-  { icon: Star, label: 'Review', href: '/admin/review' }, // ✅ updated
-  { icon: CreditCard, label: 'Subscriptions', href: '/admin/subscriptions' }, // ✅ updated
+  { icon: Star, label: 'Review', href: '/admin/review' },
+  { icon: MessageSquareQuote, label: 'Testimonials', href: '/admin/testimonials' },
+  { icon: CreditCard, label: 'Subscriptions', href: '/admin/subscriptions' },
+  { icon: Layers, label: 'Resource Categories', href: '/admin/resources-category' },
+  { icon: LibraryBig, label: 'Resources Store', href: '/admin/resources' },
+  { icon: Receipt, label: 'Resource Purchases', href: '/admin/purchase' },
+  { icon: Gift, label: 'Referral & Payouts', href: '/admin/referrals' },
   { icon: Bell, label: 'Announcement', href: '/admin/announcements' },
-  { icon: Headset, label: 'Support', href: '/admin/support' }, // ✅ updated
+  { icon: Headset, label: 'Support', href: '/admin/support' },
   { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];
 
@@ -45,24 +55,21 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
 
   return (
     <>
-      {/* Mobile Toggle */}
       <div className="md:hidden fixed top-4 left-4 z-50">
         <Button variant="outline" size="icon" onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </Button>
       </div>
 
-      {/* Sidebar */}
       <aside
         style={{
           background:
             'linear-gradient(180deg, #FFFFFF 0%, #E5EEFF 20.91%, #EDF3FF 41.83%, #DEE9FF 69.71%, #FFFFFF 100%)',
         }}
-        className={`fixed left-0 top-0 h-screen w-72 border-r border-blue-100 text-slate-700 flex flex-col transition-all duration-300 z-40 ${
+        className={`fixed left-0 top-0 h-screen w-72 border-r border-blue-100 text-slate-700 flex flex-col overflow-hidden transition-all duration-300 z-40 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Logo Section */}
         <div className="pt-10 flex flex-col items-center">
           <Image
             src="/logo.png"
@@ -74,8 +81,7 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
           />
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-6 space-y-2 mt-6">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-6 space-y-2 mt-6 pb-4">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -104,7 +110,6 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
           })}
         </nav>
 
-        {/* Logout Section */}
         <div className="p-6 border-t border-blue-100/50">
           <button
             onClick={() => setShowLogoutModal(true)}
@@ -116,7 +121,6 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
         </div>
       </aside>
 
-      {/* Logout Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center border border-blue-50">
@@ -149,7 +153,6 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
         </div>
       )}
 
-      {/* Mobile Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/20 z-30 md:hidden"

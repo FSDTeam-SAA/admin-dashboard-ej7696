@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMutation } from 'react-query';
+import { useMutation, useQuery } from 'react-query';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -96,6 +96,13 @@ export function AddPlanModal({
     return { count: 1, unit: 'months' };
   };
 
+  const { data: pricingData } = useQuery(
+    'pricing-settings-modal',
+    paymentAPI.getPricingSettings,
+    { enabled: isOpen }
+  );
+  const pricing = pricingData?.data?.data;
+
   const { mutate: savePlan, isLoading } = useMutation(
     async () => {
       const price = Number(formData.price);
@@ -105,6 +112,7 @@ export function AddPlanModal({
       const { count, unit } = toInterval(formData.duration);
 
       return paymentAPI.updatePricing({
+        examUnlockPrice: Number(pricing?.examUnlockPrice ?? 150),
         professionalPlanPrice: price,
         professionalPlanIntervalCount: count,
         professionalPlanIntervalUnit: unit,

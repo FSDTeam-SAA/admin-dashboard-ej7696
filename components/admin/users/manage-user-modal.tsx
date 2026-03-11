@@ -22,7 +22,16 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { api, examAPI, paymentAPI, userAPI } from "@/lib/api";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PERMISSIONS = [
   { id: "view_user_list", label: "View user list" },
@@ -69,6 +78,10 @@ export function ManageUserModal({
   const [initialUnlockedExamIds, setInitialUnlockedExamIds] = useState<string[]>([]);
   const [initialManualUnlockedExamIds, setInitialManualUnlockedExamIds] = useState<string[]>([]);
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
+  const [activeDeviceId, setActiveDeviceId] = useState("");
+  const [activeInstallationId, setActiveInstallationId] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState("");
+  const [isClearSessionDialogOpen, setIsClearSessionDialogOpen] = useState(false);
 
   const { data: examsData, isLoading: isExamsLoading } = useQuery(
     ["admin-exams-all"],
@@ -129,6 +142,9 @@ export function ManageUserModal({
     setInitialUnlockedExamIds(unlockedExamIds);
     setInitialManualUnlockedExamIds(manualUnlockedExamIds);
     setPasswordChangeRequired(Boolean(user.mustChangePassword));
+    setActiveDeviceId(user.activeDeviceId || "");
+    setActiveInstallationId(user.activeInstallationId || "");
+    setActiveSessionId(user.activeSessionId || "");
     setFormData({
       phone: user.phone || "",
       fullName: name,
@@ -205,6 +221,27 @@ export function ManageUserModal({
     },
   );
 
+  const { mutate: clearInstallationSession, isLoading: isClearingSession } = useMutation(
+    async () => {
+      if (!userId) throw new Error("User ID is required");
+      return userAPI.clearInstallationSession(userId);
+    },
+    {
+      onSuccess: () => {
+        setActiveDeviceId("");
+        setActiveInstallationId("");
+        setActiveSessionId("");
+        setIsClearSessionDialogOpen(false);
+        toast.success("Active installation session cleared");
+      },
+      onError: (error: any) => {
+        toast.error(
+          error?.response?.data?.message || "Failed to clear installation session",
+        );
+      },
+    },
+  );
+
   const togglePermission = (permissionId: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -255,6 +292,10 @@ export function ManageUserModal({
     .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0];
   const normalizedTier = (user?.subscriptionTier || "starter").toString().toLowerCase();
   const isProfessional = normalizedTier === "professional";
+  const resolvedActiveDeviceId = activeDeviceId || activeInstallationId;
+  const hasActiveDeviceSession = Boolean(
+    resolvedActiveDeviceId || activeSessionId,
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -297,7 +338,7 @@ export function ManageUserModal({
           </div>
 
           {/* Role & Subscription */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select
@@ -332,6 +373,35 @@ export function ManageUserModal({
                   <SelectItem value="Professional">Professional</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Active Device</Label>
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 break-all">
+                    {resolvedActiveDeviceId || "No active device"}
+                  </p>
+                  {activeSessionId ? (
+                    <p className="mt-1 text-xs text-slate-500 break-all">
+                      Session ID: {activeSessionId}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  disabled={!hasActiveDeviceSession || isClearingSession}
+                  onClick={() => setIsClearSessionDialogOpen(true)}
+                >
+                  {isClearingSession ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -574,6 +644,29 @@ export function ManageUserModal({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog
+        open={isClearSessionDialogOpen}
+        onOpenChange={setIsClearSessionDialogOpen}
+      >
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete active device session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear the user's active device/session and force a re-login.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-3">
+            <AlertDialogCancel className="rounded-lg">No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => clearInstallationSession()}
+              className="rounded-lg bg-red-600 text-white hover:bg-red-700"
+            >
+              Yes
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

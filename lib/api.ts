@@ -176,13 +176,21 @@ export const paymentAPI = {
     axiosInstance.post(`/api/v1/payments/exam/${examId}/stripe/confirm`, data),
 
   // Plan Payments (backend currently supports professional plan only)
-  createProfessionalPlanPayPalOrder: (data: { examId?: string }) =>
+  createProfessionalPlanPayPalOrder: (data: {
+    examId?: string;
+    addonProductCode?: string;
+    addonProductId?: string;
+  }) =>
     axiosInstance.post(`/api/v1/payments/plan/professional/paypal/create`, data),
 
   captureProfessionalPlanPayPalOrder: (data: { orderId: string }) =>
     axiosInstance.post(`/api/v1/payments/plan/professional/paypal/capture`, data),
 
-  createProfessionalPlanStripeIntent: (data: { examId?: string }) =>
+  createProfessionalPlanStripeIntent: (data: {
+    examId?: string;
+    addonProductCode?: string;
+    addonProductId?: string;
+  }) =>
     axiosInstance.post(`/api/v1/payments/plan/professional/stripe/create`, data),
 
   confirmProfessionalPlanStripePayment: (data: { paymentIntentId: string }) =>
@@ -209,11 +217,123 @@ export const paymentAPI = {
   getPricingSettings: () =>
     axiosInstance.get('/api/v1/payments/admin/pricing'),
 
-  getRevenueSummary: () =>
-    axiosInstance.get('/api/v1/payments/admin/summary'),
+  getRevenueSummary: (params?: { range?: string }) => {
+    const query = buildQueryString(params ?? {});
+    return axiosInstance.get(`/api/v1/payments/admin/summary${query}`);
+  },
 
   getPurchasesList: (page = 1, limit = 20) =>
     axiosInstance.get(`/api/v1/payments/admin/purchases?page=${page}&limit=${limit}`),
+
+  getProfessionalPlanPurchases: (
+    page = 1,
+    limit = 20,
+    filters?: { status?: string; userId?: string; provider?: string; examId?: string }
+  ) => {
+    const query = buildQueryString({ page, limit, ...filters });
+    return axiosInstance.get(`/api/v1/payments/admin/plan-purchases${query}`);
+  },
+
+  updateProfessionalPlanPurchaseStatus: (
+    purchaseId: string,
+    data: { status: "pending" | "completed" | "failed" | "cancelled" | "refunded"; reason?: string }
+  ) => axiosInstance.patch(`/api/v1/payments/admin/plan-purchases/${purchaseId}/status`, data),
+};
+
+// ============ RESOURCE STORE APIs ============
+
+export const resourceAPI = {
+  // User
+  getStore: () => axiosInstance.get("/api/v1/resources/store"),
+  getUpgradeAddOnOptions: () => axiosInstance.get("/api/v1/resources/upgrade-addon-options"),
+  getPreview: (productId: string) => axiosInstance.get(`/api/v1/resources/products/${productId}/preview`),
+  getContent: (productId: string) => axiosInstance.get(`/api/v1/resources/products/${productId}/content`),
+  getMyUnlocks: () => axiosInstance.get("/api/v1/resources/my-unlocks"),
+
+  createStripePurchase: (data: { productId?: string; productCode?: string }) =>
+    axiosInstance.post("/api/v1/resources/purchase/stripe/create", data),
+  confirmStripePurchase: (data: { paymentIntentId: string }) =>
+    axiosInstance.post("/api/v1/resources/purchase/stripe/confirm", data),
+  createPayPalPurchase: (data: { productId?: string; productCode?: string }) =>
+    axiosInstance.post("/api/v1/resources/purchase/paypal/create", data),
+  capturePayPalPurchase: (data: { orderId: string }) =>
+    axiosInstance.post("/api/v1/resources/purchase/paypal/capture", data),
+
+  // Admin
+  listCategories: () => axiosInstance.get("/api/v1/resources/admin/categories"),
+  createCategory: (data: {
+    title: string;
+    slug: string;
+    shortCode?: string;
+    description?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }) => axiosInstance.post("/api/v1/resources/admin/categories", data),
+  updateCategory: (
+    categoryId: string,
+    data: {
+      title?: string;
+      slug?: string;
+      shortCode?: string;
+      description?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    }
+  ) => axiosInstance.patch(`/api/v1/resources/admin/categories/${categoryId}`, data),
+  deleteCategory: (categoryId: string) =>
+    axiosInstance.delete(`/api/v1/resources/admin/categories/${categoryId}`),
+
+  listProducts: () => axiosInstance.get("/api/v1/resources/admin/products"),
+  createProduct: (data: any) =>
+    axiosInstance.post("/api/v1/resources/admin/products", data, data instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined),
+  updateProduct: (productId: string, data: any) =>
+    axiosInstance.patch(
+      `/api/v1/resources/admin/products/${productId}`,
+      data,
+      data instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined
+    ),
+  deleteProduct: (productId: string) =>
+    axiosInstance.delete(`/api/v1/resources/admin/products/${productId}`),
+
+  listPurchases: (
+    page = 1,
+    limit = 20,
+    filters?: { status?: string; purchaseType?: string; userId?: string; productCode?: string }
+  ) => {
+    const query = buildQueryString({ page, limit, ...filters });
+    return axiosInstance.get(`/api/v1/resources/admin/purchases${query}`);
+  },
+};
+
+// ============ REFERRAL APIs ============
+
+export const referralAPI = {
+  // User/Public
+  validateCode: (code: string) => axiosInstance.get(`/api/v1/referrals/public/${code}`),
+  getMyProfile: () => axiosInstance.get("/api/v1/referrals/me"),
+  getMyReferredUsers: (page = 1, limit = 20) =>
+    axiosInstance.get(`/api/v1/referrals/referred-users?page=${page}&limit=${limit}`),
+  getMyLedger: (page = 1, limit = 20) =>
+    axiosInstance.get(`/api/v1/referrals/ledger?page=${page}&limit=${limit}`),
+  convertToCredit: (data: { amount?: number }) =>
+    axiosInstance.post("/api/v1/referrals/convert-to-credit", data),
+  requestCashPayout: (data: { amount?: number }) =>
+    axiosInstance.post("/api/v1/referrals/cash-payout-request", data),
+
+  // Admin
+  getOverview: () => axiosInstance.get("/api/v1/referrals/admin/overview"),
+  listPayoutRequests: (page = 1, limit = 20, status?: string) => {
+    const query = buildQueryString({ page, limit, status });
+    return axiosInstance.get(`/api/v1/referrals/admin/payout-requests${query}`);
+  },
+  updatePayoutRequestStatus: (
+    requestId: string,
+    data: { status: "approved" | "rejected" | "paid"; notes?: string }
+  ) => axiosInstance.patch(`/api/v1/referrals/admin/payout-requests/${requestId}`, data),
 };
 
 // ============ SUPPORT APIs ============
@@ -409,6 +529,8 @@ export const api = {
   updatePricing: paymentAPI.updatePricing,
   getRevenueSummary: paymentAPI.getRevenueSummary,
   getPurchasesList: paymentAPI.getPurchasesList,
+  getProfessionalPlanPurchases: paymentAPI.getProfessionalPlanPurchases,
+  updateProfessionalPlanPurchaseStatus: paymentAPI.updateProfessionalPlanPurchaseStatus,
 
   // Announcements
   listAnnouncements: announcementAPI.listAnnouncements,
@@ -424,4 +546,20 @@ export const api = {
 
   // Subscriptions
   listSubscriptions: subscriptionAPI.listSubscriptions,
+
+  // Resource Store (Admin)
+  listResourceCategories: resourceAPI.listCategories,
+  createResourceCategory: resourceAPI.createCategory,
+  updateResourceCategory: resourceAPI.updateCategory,
+  deleteResourceCategory: resourceAPI.deleteCategory,
+  listResourceProducts: resourceAPI.listProducts,
+  createResourceProduct: resourceAPI.createProduct,
+  updateResourceProduct: resourceAPI.updateProduct,
+  deleteResourceProduct: resourceAPI.deleteProduct,
+  listResourcePurchases: resourceAPI.listPurchases,
+
+  // Referrals (Admin)
+  getReferralOverview: referralAPI.getOverview,
+  listReferralPayoutRequests: referralAPI.listPayoutRequests,
+  updateReferralPayoutRequestStatus: referralAPI.updatePayoutRequestStatus,
 };
