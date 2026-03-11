@@ -11,8 +11,6 @@ const apiBaseUrl = trimmedBaseUrl.endsWith('/api/v1')
 const loginUrl = `${apiBaseUrl}/api/v1/auth/login`;
 const refreshUrl = `${apiBaseUrl}/api/v1/auth/refresh-token`;
 
-console.log("LLLLLL", loginUrl)
-
 const decodeJwtPayload = (token: string) => {
   try {
     const payload = token.split('.')[1];
@@ -89,12 +87,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         try {
           if (!credentials?.email || !credentials?.password) {
-            throw new Error('Email and password required');
+            return null;
           }
 
           const installationId = normalizeInstallationId(credentials.installationId);
           if (!installationId) {
-            throw new Error('Installation identifier is required');
+            return null;
           }
 
           const response = await axios.post(
@@ -113,8 +111,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
           const payload = response.data?.data ?? response.data;
 
-          console.log("AAAAAAAAA", payload)
-
           if (payload?.accessToken) {
             return {
               id: payload._id || payload.user?._id,
@@ -129,10 +125,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             };
           }
 
-          throw new Error('Invalid credentials');
+          return null;
         } catch (error: any) {
-          console.error('[v0] Auth error:', error.message);
-          throw new Error(error.response?.data?.message || 'Authentication failed');
+          const message = error?.response?.data?.message || error?.message || 'Authentication failed';
+          console.error('[auth] Credentials authorize failed:', message);
+          return null;
         }
       },
     }),
