@@ -18,19 +18,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFF]">
-      {/* Sidebar - Fixed width of 72 (288px) or 64 (256px) */}
+    // h-screen and overflow-hidden prevent the whole page from scrolling
+    <div className="flex h-screen bg-[#F8FAFF] overflow-hidden">
+      
+      {/* Sidebar - Remains fixed on the left */}
       <Sidebar userName={session.user?.name ?? session.user?.email ?? 'Admin'} />
       
-      {/* Content Wrapper */}
-      <div className="flex-1 flex flex-col md:ml-72 transition-all duration-300">
-        {/* Header sits at the top of the main section */}
+      {/* Content Wrapper - This container handles the layout for the right side */}
+      <div className="flex-1 flex flex-col md:ml-72 transition-all duration-300 min-w-0">
+        
+        {/* Header - Stays at the top because the parent is flex-col and not scrolling */}
         <Header />
         
-        {/* Main Content Area */}
-        <main className="p-4 md:p-8 pt-2 max-w-[1600px]">
-          {children}
+        {/* Main Content Area - This is the ONLY part that scrolls */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pt-2">
+          <div className="max-w-[1600px] mx-auto">
+            {children}
+          </div>
         </main>
+
       </div>
     </div>
   );
