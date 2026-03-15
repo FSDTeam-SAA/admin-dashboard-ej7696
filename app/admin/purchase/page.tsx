@@ -120,47 +120,85 @@ export default function PurchaseAdminPage() {
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="text-left py-2">User</th>
-                <th className="text-left py-2">Product</th>
+                <th className="text-left py-2">Product Name</th>
                 <th className="text-left py-2">Code</th>
                 <th className="text-left py-2">Type</th>
                 <th className="text-left py-2">Provider</th>
-                <th className="text-left py-2">Status</th>
                 <th className="text-left py-2">Amount</th>
                 <th className="text-left py-2">Date</th>
               </tr>
             </thead>
             <tbody>
-              {(isLoading ? [] : purchases).map((purchase: any) => (
-                <tr key={purchase._id} className="border-b border-slate-100">
-                  <td className="py-2">
-                    {purchase.userId?.email ||
-                      purchase.userId?.name ||
-                      [purchase.userId?.firstName, purchase.userId?.lastName]
-                        .filter(Boolean)
-                        .join(" ") ||
-                      "-"}
-                  </td>
-                  <td className="py-2">{purchase.productId?.title || "-"}</td>
-                  <td className="py-2">{purchase.productCode || "-"}</td>
-                  <td className="py-2">{purchase.purchaseType || "-"}</td>
-                  <td className="py-2">{purchase.provider || "-"}</td>
-                  <td className="py-2">{purchase.status || "-"}</td>
-                  <td className="py-2">${Number(purchase.finalPrice || 0).toFixed(2)}</td>
-                  <td className="py-2">
-                    {purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString() : "-"}
-                  </td>
-                </tr>
-              ))}
+              {(isLoading ? [] : purchases).map((purchase: any) => {
+                const userName =
+                  purchase.userId?.name ||
+                  [purchase.userId?.firstName, purchase.userId?.lastName]
+                    .filter(Boolean)
+                    .join(" ") ||
+                  "-";
+                const userEmail = purchase.userId?.email || "-";
+                const userImageUrl =
+                  purchase.userId?.avatar?.url ||
+                  purchase.userId?.image?.url ||
+                  purchase.userId?.profileImageUrl ||
+                  "";
+
+                return (
+                  <tr key={purchase._id} className="border-b border-slate-100">
+                    <td className="py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
+                          {userImageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={userImageUrl}
+                              alt={userName}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs font-medium text-slate-600">
+                              {(userName || userEmail || "U")
+                                .toString()
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 truncate">
+                            {userName}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {userEmail}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2">{purchase.productId?.title || "-"}</td>
+                    <td className="py-2">{purchase.productCode || "-"}</td>
+                    <td className="py-2">{purchase.purchaseType || "-"}</td>
+                    <td className="py-2">{purchase.status || "-"}</td>
+                    <td className="py-2">
+                      ${Number(purchase.finalPrice || 0).toFixed(2)}
+                    </td>
+                    <td className="py-2">
+                      {purchase.createdAt
+                        ? new Date(purchase.createdAt).toLocaleDateString()
+                        : "-"}
+                    </td>
+                  </tr>
+                );
+              })}
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="py-4 text-slate-500">
+                  <td colSpan={7} className="py-4 text-slate-500">
                     Loading purchase ledger...
                   </td>
                 </tr>
               )}
               {!isLoading && purchases.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-slate-500">
+                  <td colSpan={7} className="py-6 text-center text-slate-500">
                     No purchases found.
                   </td>
                 </tr>
