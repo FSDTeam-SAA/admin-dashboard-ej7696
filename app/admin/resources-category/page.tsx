@@ -180,11 +180,6 @@ export default function ResourcesCategoryAdminPage() {
         </div>
       </div>
 
-      <Card className="p-4">
-        <p className="text-sm text-slate-500">Total Categories</p>
-        <p className="text-2xl font-bold text-slate-900">{categories.length}</p>
-      </Card>
-
       <Card className="p-5">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">All Categories</h2>
         <div className="overflow-x-auto">
