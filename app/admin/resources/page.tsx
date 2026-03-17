@@ -436,10 +436,10 @@ export default function ResourcesAdminPage() {
           <p className="text-gray-500 mt-1 text-sm">Manage eBook products.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCreateProductModal} className="gap-2 cursor-pointer">
+          <Button onClick={openCreateProductModal} className="gap-2 cursor-pointer h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10">
             <Plus className="h-4 w-4" /> Add Resources
           </Button>
-          <Button onClick={openCreateBundleModal} variant="outline" className="gap-2 cursor-pointer">
+          <Button onClick={openCreateBundleModal} variant="outline" className="gap-2 cursor-pointer h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10">
             <Plus className="h-4 w-4" /> Create Bundle
           </Button>
         </div>
@@ -470,7 +470,7 @@ export default function ResourcesAdminPage() {
             onClick={() => setResourceView("resources")}
             className={`text-sm font-semibold transition-colors cursor-pointer ${
               resourceView === "resources"
-                ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white"
+                ? "h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
                 : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
             }`}
           >
@@ -482,7 +482,7 @@ export default function ResourcesAdminPage() {
             onClick={() => setResourceView("bundles")}
             className={`text-sm font-semibold transition-colors cursor-pointer ${
               resourceView === "bundles"
-                ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white"
+                ? "h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
                 : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
             }`}
           >
@@ -563,10 +563,9 @@ export default function ResourcesAdminPage() {
                       </Button>
                       <Button
                         size="icon"
-                        variant="destructive"
                         onClick={() => openDeleteModal(product)}
                         title="Delete product"
-                        className="bg-red-400 hover:bg-red-500 cursor-pointer"
+                        className="bg-red-400 !hover:bg-red-500 cursor-pointer text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

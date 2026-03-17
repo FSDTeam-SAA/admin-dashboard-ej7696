@@ -243,7 +243,8 @@ export default function ReviewPage() {
             </>
           )}
           <Button
-            className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1E40AF]"
+            className="h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
+            variant="outline"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -303,7 +304,7 @@ export default function ReviewPage() {
                     : "border-slate-200"
                 }`}
               >
-                <button
+                <Button
                   type="button"
                   onClick={() => setSelectedReview(review)}
                   className="w-full text-left"
@@ -340,7 +341,7 @@ export default function ReviewPage() {
                       "{review.feedbackText || "No feedback text provided."}"
                     </p>
                   </div>
-                </button>
+                </Button>
               </Card>
             );
           })

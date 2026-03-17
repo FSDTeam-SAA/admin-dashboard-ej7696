@@ -285,7 +285,7 @@ export default function SettingsPage() {
     : "U";
 
   return (
-    <div className="min-h-screen bg-[#F5F8FF] p-4 md:p-6 space-y-6">
+    <div className=" space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Setting</h1>

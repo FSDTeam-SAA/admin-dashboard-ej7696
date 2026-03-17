@@ -111,13 +111,13 @@ export function Sidebar({ userName = 'Admin' }: { userName?: string }) {
         </nav>
 
         <div className="p-6 border-t border-blue-100/50">
-          <button
+          <Button
             onClick={() => setShowLogoutModal(true)}
             className="flex items-center gap-4 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors font-bold"
           >
             <LogOut className="w-5 h-5" />
             Logout
-          </button>
+          </Button>
         </div>
       </aside>
 

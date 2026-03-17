@@ -232,11 +232,10 @@ export default function SupportPage() {
                 {tickets.map((ticket) => {
                   const isActive = ticket._id === selectedTicketId;
                   return (
-                    <button
+                    <div
                       key={ticket._id}
-                      type="button"
                       onClick={() => setSelectedTicketId(ticket._id)}
-                      className={`w-full text-left px-4 py-4 transition ${
+                      className={`w-full text-left px-4 py-4 transition cursor-pointer ${
                         isActive ? "bg-blue-50" : "hover:bg-gray-50"
                       }`}
                     >
@@ -257,7 +256,7 @@ export default function SupportPage() {
                       <p className="text-xs text-gray-400 mt-2">
                         Updated {formatDate(ticket.lastMessageAt || ticket.createdAt)}
                       </p>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

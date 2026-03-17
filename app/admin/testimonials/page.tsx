@@ -118,7 +118,8 @@ export default function TestimonialsPage() {
               Delete
             </Button>
             <Button 
-              className="gap-2 rounded-full px-6 bg-green-600 hover:bg-green-700"
+              variant="outline"
+              className="gap-2 h-10 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
               onClick={() => toast.success('Testimonial posted')}
             >
               Post

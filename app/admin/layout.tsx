@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     // h-screen and overflow-hidden prevent the whole page from scrolling
-    <div className="flex h-screen bg-[#F8FAFF] overflow-hidden">
+    <div className="admin-dashboard-theme flex h-screen bg-[#F8FAFF] overflow-hidden">
       
       {/* Sidebar - Remains fixed on the left */}
       <Sidebar userName={session.user?.name ?? session.user?.email ?? 'Admin'} />
