@@ -495,7 +495,6 @@ export default function ResourcesAdminPage() {
               <tr className="border-b border-slate-200">
                 <th className="text-left py-2">Cover</th>
                 <th className="text-left py-2">Title</th>
-                <th className="text-left py-2">Code</th>
                 <th className="text-left py-2">Category</th>
                 <th className="text-left py-2">Price</th>
                 <th className="text-left py-2">Original Price</th>
@@ -523,7 +522,6 @@ export default function ResourcesAdminPage() {
                     </div>
                   </td>
                   <td className="py-2">{product.title}</td>
-                  <td className="py-2">{product.code}</td>
                   <td className="py-2">
                     {typeof product.categoryId === "object"
                       ? product.categoryId?.title || "-"
@@ -575,14 +573,14 @@ export default function ResourcesAdminPage() {
               ))}
               {loadingProducts && (
                 <tr>
-                  <td colSpan={9} className="py-4 text-slate-500">
+                  <td colSpan={7} className="py-4 text-slate-500">
                     Loading products...
                   </td>
                 </tr>
               )}
               {!loadingProducts && listedProducts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-4 text-slate-500">
+                  <td colSpan={7} className="py-4 text-slate-500">
                     {resourceView === "bundles"
                       ? "No bundle resources found."
                       : "No resources found."}
@@ -715,32 +713,6 @@ export default function ResourcesAdminPage() {
                 }
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Short Description</Label>
-              <Input
-                value={productForm.shortDescription}
-                onChange={(e) =>
-                  setProductForm((prev) => ({
-                    ...prev,
-                    shortDescription: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Cover Image URL (optional)</Label>
-              <Input
-                value={productForm.coverImageUrl}
-                onChange={(e) =>
-                  setProductForm((prev) => ({
-                    ...prev,
-                    coverImageUrl: e.target.value,
-                  }))
-                }
-                placeholder="https://res.cloudinary.com/.../cover.jpg"
-              />
-            </div>
             <div className="space-y-2">
               <Label>Upload Cover Image</Label>
               <Input
@@ -772,19 +744,6 @@ export default function ResourcesAdminPage() {
             </div>
             {!isBundleCreateMode && (
               <>
-                <div className="space-y-2">
-                  <Label>Content URL (optional)</Label>
-                  <Input
-                    value={productForm.contentUrl}
-                    onChange={(e) =>
-                      setProductForm((prev) => ({
-                        ...prev,
-                        contentUrl: e.target.value,
-                      }))
-                    }
-                    placeholder="https://res.cloudinary.com/.../guide.pdf"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>Upload Content File (PDF/DOC/DOCX/etc.)</Label>
                   <Input

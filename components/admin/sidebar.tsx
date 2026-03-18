@@ -19,7 +19,6 @@ import {
   Gift,
   Layers,
   LibraryBig,
-  MessageSquareQuote,
   Receipt,
 } from 'lucide-react';
 
@@ -33,7 +32,6 @@ const menuItems = [
   { icon: Users, label: 'User Management', href: '/admin/users' },
   { icon: TrendingUp, label: 'Revenue', href: '/admin/revenue' },
   { icon: Star, label: 'Review', href: '/admin/review' },
-  { icon: MessageSquareQuote, label: 'Testimonials', href: '/admin/testimonials' },
   { icon: CreditCard, label: 'Subscriptions', href: '/admin/subscriptions' },
   { icon: Layers, label: 'Resource Categories', href: '/admin/resources-category' },
   { icon: LibraryBig, label: 'Resources Store', href: '/admin/resources' },
