@@ -254,94 +254,97 @@ export default function ReviewPage() {
       </div>
 
       {/* 3-Column Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
             <Card
               key={i}
-              className="rounded-2xl border border-slate-100 bg-white p-6"
+              className="gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <Skeleton className="h-7 w-7 rounded-full" />
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-2.5 w-20" />
                   </div>
                 </div>
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((__, starIdx) => (
-                    <Skeleton key={starIdx} className="h-3 w-3 rounded-full" />
+                    <Skeleton key={starIdx} className="h-2.5 w-2.5 rounded-full" />
                   ))}
                 </div>
               </div>
-              <div className="mt-4 space-y-2">
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-5/6" />
-                <Skeleton className="h-3 w-2/3" />
+              <div className="space-y-2">
+                <Skeleton className="h-2.5 w-full" />
+                <Skeleton className="h-2.5 w-5/6" />
+                <Skeleton className="h-2.5 w-2/3" />
               </div>
             </Card>
           ))
         ) : reviews.length === 0 ? (
-          <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white py-20 text-center text-slate-400">
+          <div className="col-span-full py-20 text-center text-slate-400">
             No testimonials found.
           </div>
         ) : (
           reviews.map((review, index) => {
             const id = getReviewId(review);
             const cardKey = id || `review-${index}`;
-            const isSelected = id && id === selectedId;
+            const isSelected = Boolean(id) && id === selectedId;
             const name = review.displayName || review.userName || "Guest";
-            const subline = review.userEmail || review.examName || "Unknown";
+            const email = review.userEmail || "Unknown";
+            const subtitle = review.examName || email;
             const rating = review.stars || 0;
 
             return (
               <Card
                 key={cardKey}
-                className={`rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:shadow-md ${
+                onClick={() => setSelectedReview(review)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedReview(review);
+                  }
+                }}
+                tabIndex={0}
+                className={`gap-0 rounded-xl border bg-white p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A8A]/20 ${
                   isSelected
-                    ? "border-green-500 bg-[#E7F7EC] ring-1 ring-green-200"
-                    : "border-slate-200"
+                    ? "border-[#1E3A8A]/45 ring-2 ring-[#1E3A8A]/10"
+                    : "border-slate-200 shadow-sm hover:border-slate-300"
                 }`}
               >
-                <Button
-                  type="button"
-                  onClick={() => setSelectedReview(review)}
-                  className="w-full text-left"
-                  aria-pressed={isSelected}
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                          <User className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-800">
-                            {name}
-                          </h3>
-                          <p className="text-xs text-slate-500">{subline}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 5 }).map((_, starIdx) => (
-                          <Star
-                            key={starIdx}
-                            className={`h-3.5 w-3.5 ${
-                              starIdx < rating
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-slate-200"
-                            }`}
-                          />
-                        ))}
-                      </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                      <User className="h-3.5 w-3.5 text-slate-500" />
                     </div>
-
-                    <p className="mt-4 min-h-[80px] text-sm italic leading-relaxed text-slate-600 line-clamp-4">
-                      "{review.feedbackText || "No feedback text provided."}"
-                    </p>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-[14px] font-semibold leading-tight text-slate-900">
+                        {name}
+                      </h3>
+                      <p className="mt-0.5 truncate text-[10px] text-slate-400">
+                        {subtitle}
+                      </p>
+                    </div>
                   </div>
-                </Button>
+
+                  <div className="mt-1 flex shrink-0 gap-0.5">
+                    {Array.from({ length: 5 }).map((_, starIdx) => (
+                      <Star
+                        key={starIdx}
+                        className={`h-3 w-3 ${
+                          starIdx < rating
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <p className="mt-3 line-clamp-4 text-[12px] italic leading-relaxed text-slate-600">
+                  {review.feedbackText || "No feedback provided."}
+                </p>
               </Card>
             );
           })

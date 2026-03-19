@@ -187,9 +187,6 @@ export default function ResourcesCategoryAdminPage() {
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="text-left py-2">Title</th>
-                <th className="text-left py-2">Slug</th>
-                <th className="text-left py-2">Short Code</th>
-                <th className="text-left py-2">Sort</th>
                 <th className="text-left py-2">Status</th>
                 <th className="text-left py-2">Actions</th>
               </tr>
@@ -198,9 +195,6 @@ export default function ResourcesCategoryAdminPage() {
               {(isLoading ? [] : categories).map((category: any) => (
                 <tr key={category._id} className="border-b border-slate-100">
                   <td className="py-2">{category.title}</td>
-                  <td className="py-2">{category.slug}</td>
-                  <td className="py-2">{category.shortCode || "-"}</td>
-                  <td className="py-2">{category.sortOrder ?? 0}</td>
                   <td className="py-2">
                     <Button
                       variant="outline"
