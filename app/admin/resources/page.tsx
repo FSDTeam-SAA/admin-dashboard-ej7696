@@ -608,10 +608,10 @@ export default function ResourcesAdminPage() {
               {editingProductId
                 ? isBundleCreateMode
                   ? "Edit Bundle"
-                  : "Edit Product"
+                  : "Edit Resource"
                 : isBundleCreateMode
                   ? "Create Bundle"
-                  : "Add Product"}
+                  : "Add Resource"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
