@@ -102,17 +102,6 @@ export default function PurchaseAdminPage() {
               <option value="professional_upgrade_addon">Upgrade Add-On</option>
             </select>
           </div>
-          <div className="space-y-1 md:col-span-2">
-            <p className="text-xs text-slate-500">Product Code</p>
-            <Input
-              value={productCodeFilter}
-              placeholder="api510_inspection_guide"
-              onChange={(e) => {
-                setPage(1);
-                setProductCodeFilter(e.target.value);
-              }}
-            />
-          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -121,7 +110,6 @@ export default function PurchaseAdminPage() {
               <tr className="border-b border-slate-200">
                 <th className="text-left py-2">User</th>
                 <th className="text-left py-2">Product Name</th>
-                <th className="text-left py-2">Code</th>
                 <th className="text-left py-2">Type</th>
                 <th className="text-left py-2">Provider</th>
                 <th className="text-left py-2">Amount</th>
@@ -175,7 +163,6 @@ export default function PurchaseAdminPage() {
                       </div>
                     </td>
                     <td className="py-2">{purchase.productId?.title || "-"}</td>
-                    <td className="py-2">{purchase.productCode || "-"}</td>
                     <td className="py-2">{purchase.purchaseType || "-"}</td>
                     <td className="py-2">{purchase.status || "-"}</td>
                     <td className="py-2">
