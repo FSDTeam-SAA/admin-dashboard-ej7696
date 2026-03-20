@@ -6,7 +6,7 @@ export async function middleware(req: NextRequest) {
   const session = await auth();
   const pathname = req.nextUrl.pathname;
   const role = (session?.role || session?.user?.role || '').toString().toLowerCase();
-  const isAuthValid = Boolean(session?.accessToken) && !session?.error;
+  const isAuthValid = Boolean(session?.accessToken);
 
   // Protect admin routes
   if (pathname.startsWith('/admin')) {

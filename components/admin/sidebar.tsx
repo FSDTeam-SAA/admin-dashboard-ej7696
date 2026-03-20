@@ -36,7 +36,7 @@ const menuItems = [
   { icon: Layers, label: 'Resource Categories', href: '/admin/resources-category' },
   { icon: LibraryBig, label: 'Resources Store', href: '/admin/resources' },
   { icon: Receipt, label: 'Resource Purchases', href: '/admin/purchase' },
-  { icon: Gift, label: 'Referral & Payouts', href: '/admin/referrals' },
+  { icon: Gift, label: 'Referral', href: '/admin/referrals' },
   { icon: Bell, label: 'Announcement', href: '/admin/announcements' },
   { icon: Headset, label: 'Support', href: '/admin/support' },
   { icon: Settings, label: 'Settings', href: '/admin/settings' },

@@ -10,6 +10,8 @@ const apiBaseUrl = trimmedBaseUrl.endsWith('/api/v1')
   : trimmedBaseUrl;
 const loginUrl = `${apiBaseUrl}/api/v1/auth/login`;
 const refreshUrl = `${apiBaseUrl}/api/v1/auth/refresh-token`;
+let inFlightRefreshPromise: Promise<any> | null = null;
+let inFlightRefreshKey = '';
 
 const decodeJwtPayload = (token: string) => {
   try {
@@ -67,12 +69,33 @@ const refreshAccessToken = async (token: any) => {
     console.error(' Refresh token error:', error);
     return {
       ...token,
-      accessToken: undefined,
-      accessTokenExpires: 0,
-      refreshToken: undefined,
+      accessTokenExpires: token.accessTokenExpires ?? 0,
       error: 'RefreshAccessTokenError',
     };
   }
+};
+
+const getRefreshLockKey = (token: any) => {
+  const refreshToken = token?.refreshToken?.toString?.() || '';
+  const installationId = normalizeInstallationId(token?.installationId);
+  return `${refreshToken}:${installationId}`;
+};
+
+const refreshAccessTokenWithLock = async (token: any) => {
+  const refreshKey = getRefreshLockKey(token);
+  if (!refreshKey || refreshKey.startsWith(':')) {
+    return refreshAccessToken(token);
+  }
+
+  if (!inFlightRefreshPromise || inFlightRefreshKey !== refreshKey) {
+    inFlightRefreshKey = refreshKey;
+    inFlightRefreshPromise = refreshAccessToken(token).finally(() => {
+      inFlightRefreshPromise = null;
+      inFlightRefreshKey = '';
+    });
+  }
+
+  return inFlightRefreshPromise;
 };
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
@@ -154,7 +177,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
 
       if (token.refreshToken) {
-        return refreshAccessToken(token);
+        return refreshAccessTokenWithLock(token);
       }
 
       return token;

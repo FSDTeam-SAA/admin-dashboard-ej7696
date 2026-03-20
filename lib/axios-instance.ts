@@ -17,7 +17,11 @@ const axiosInstance = axios.create({
 type RetriableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
 
 let refreshSessionPromise: Promise<Awaited<ReturnType<typeof getSession>>> | null = null;
+let sharedSessionPromise: Promise<Awaited<ReturnType<typeof getSession>>> | null = null;
+let cachedSession: Awaited<ReturnType<typeof getSession>> | null = null;
+let cachedSessionAt = 0;
 let isSigningOut = false;
+const SESSION_CACHE_TTL_MS = 5000;
 
 const setHeader = (
   headers: AxiosRequestConfig['headers'] | undefined,
@@ -41,11 +45,38 @@ const setHeader = (
 
 const getRefreshedSession = async () => {
   if (!refreshSessionPromise) {
-    refreshSessionPromise = getSession({ broadcast: false }).finally(() => {
-      refreshSessionPromise = null;
-    });
+    refreshSessionPromise = getSession({ broadcast: false })
+      .then((session) => {
+        cachedSession = session;
+        cachedSessionAt = Date.now();
+        return session;
+      })
+      .finally(() => {
+        refreshSessionPromise = null;
+      });
   }
   return refreshSessionPromise;
+};
+
+const getSharedSession = async () => {
+  const now = Date.now();
+  if (cachedSession && now - cachedSessionAt < SESSION_CACHE_TTL_MS) {
+    return cachedSession;
+  }
+
+  if (!sharedSessionPromise) {
+    sharedSessionPromise = getSession({ broadcast: false })
+      .then((session) => {
+        cachedSession = session;
+        cachedSessionAt = Date.now();
+        return session;
+      })
+      .finally(() => {
+        sharedSessionPromise = null;
+      });
+  }
+
+  return sharedSessionPromise;
 };
 
 // Request interceptor to add token
@@ -57,7 +88,7 @@ axiosInstance.interceptors.request.use(
         config.headers = setHeader(config.headers, INSTALLATION_ID_HEADER, installationId);
       }
 
-      const session = await getSession({ broadcast: false });
+      const session = await getSharedSession();
       if (session?.accessToken) {
         config.headers = setHeader(config.headers, 'Authorization', `Bearer ${session.accessToken}`);
       }
@@ -81,7 +112,7 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       const session = await getRefreshedSession();
-      if (session?.accessToken && !session?.error) {
+      if (session?.accessToken) {
         originalRequest.headers = setHeader(
           originalRequest.headers,
           'Authorization',
@@ -96,6 +127,8 @@ axiosInstance.interceptors.response.use(
       if (typeof window !== 'undefined') {
         if (!isSigningOut) {
           isSigningOut = true;
+          cachedSession = null;
+          cachedSessionAt = 0;
           await signOut({ redirect: true, callbackUrl: '/auth/login' });
         } else {
           window.location.href = '/auth/login';

@@ -125,12 +125,8 @@
 }
 
 @layer components {
-  body:has(.admin-dashboard-theme) button,
   body:has(.admin-dashboard-theme) [data-slot='button'],
-  body:has(.admin-dashboard-theme) [role='button'],
-  .admin-dashboard-theme button,
-  .admin-dashboard-theme [data-slot='button'],
-  .admin-dashboard-theme [role='button'] {
+  .admin-dashboard-theme [data-slot='button'] {
     height: 2.5rem !important; /* h-10 */
     border-radius: 9999px !important; /* rounded-full */
     background-color: #1e3a8a !important; /* bg-[#1E3A8A] */
@@ -139,12 +135,8 @@
     padding-right: 1.5rem !important; /* px-6 */
   }
 
-  body:has(.admin-dashboard-theme) button:hover,
   body:has(.admin-dashboard-theme) [data-slot='button']:hover,
-  body:has(.admin-dashboard-theme) [role='button']:hover,
-  .admin-dashboard-theme button:hover,
-  .admin-dashboard-theme [data-slot='button']:hover,
-  .admin-dashboard-theme [role='button']:hover {
+  .admin-dashboard-theme [data-slot='button']:hover {
     background-color: #1c357b !important; /* hover:bg-[#1C357B] */
     color: #fff !important;
   }

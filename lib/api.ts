@@ -326,6 +326,14 @@ export const referralAPI = {
 
   // Admin
   getOverview: () => axiosInstance.get("/api/v1/referrals/admin/overview"),
+  listAdminRelationships: (
+    page = 1,
+    limit = 20,
+    kind?: "shared" | "used"
+  ) => {
+    const query = buildQueryString({ page, limit, kind });
+    return axiosInstance.get(`/api/v1/referrals/admin/relationships${query}`);
+  },
   listPayoutRequests: (page = 1, limit = 20, status?: string) => {
     const query = buildQueryString({ page, limit, status });
     return axiosInstance.get(`/api/v1/referrals/admin/payout-requests${query}`);

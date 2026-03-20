@@ -48,6 +48,35 @@ const PERMISSIONS = [
   { id: "credential_management", label: "Credential management" },
 ];
 
+const normalizeExamId = (value: unknown): string | null => {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const byObjectId = record._id;
+    const byId = record.id;
+
+    if (typeof byObjectId === "string" || typeof byObjectId === "number") {
+      return String(byObjectId);
+    }
+
+    if (typeof byId === "string" || typeof byId === "number") {
+      return String(byId);
+    }
+
+    if (typeof record.toString === "function") {
+      const asString = record.toString();
+      if (asString && asString !== "[object Object]") {
+        return asString;
+      }
+    }
+  }
+
+  return null;
+};
+
 interface ManageUserModalProps {
   isOpen: boolean;
   userId?: string;
@@ -129,14 +158,14 @@ export function ManageUserModal({
     };
     const unlockedExamIds = Array.isArray(user.unlockedExams)
       ? user.unlockedExams
-          .map((e: any) => e?.examId?.toString?.() || e?.examId)
-          .filter(Boolean)
+          .map((e: any) => normalizeExamId(e?.examId))
+          .filter((examId: string | null): examId is string => Boolean(examId))
       : [];
     const manualUnlockedExamIds = Array.isArray(user.unlockedExams)
       ? user.unlockedExams
           .filter((e: any) => e?.purchaseType === "manual")
-          .map((e: any) => e?.examId?.toString?.() || e?.examId)
-          .filter(Boolean)
+          .map((e: any) => normalizeExamId(e?.examId))
+          .filter((examId: string | null): examId is string => Boolean(examId))
       : [];
 
     setInitialUnlockedExamIds(unlockedExamIds);
@@ -165,11 +194,15 @@ export function ManageUserModal({
 
       await api.updateUser(userId, formData);
 
-      const newUnlocks = formData.unlockedExams.filter(
-        (examId) => !initialUnlockedExamIds.includes(examId),
+      const nextUnlockedSet = new Set(formData.unlockedExams);
+      const initialUnlockedSet = new Set(initialUnlockedExamIds);
+      const initialManualSet = new Set(initialManualUnlockedExamIds);
+
+      const newUnlocks = Array.from(nextUnlockedSet).filter(
+        (examId) => !initialUnlockedSet.has(examId),
       );
-      const lockedManualExamIds = initialManualUnlockedExamIds.filter(
-        (examId) => !formData.unlockedExams.includes(examId),
+      const lockedManualExamIds = Array.from(initialManualSet).filter(
+        (examId) => !nextUnlockedSet.has(examId),
       );
 
       if (newUnlocks.length) {
@@ -271,12 +304,14 @@ export function ManageUserModal({
 
   const userUnlockedExams = Array.isArray(user?.unlockedExams) ? user.unlockedExams : [];
   const unlockSourceByExamId = userUnlockedExams.reduce((acc: Record<string, string>, item: any) => {
-    const examId = item?.examId?.toString?.() || item?.examId;
-    if (examId && item?.purchaseType) {
+    const examId = normalizeExamId(item?.examId);
+    if (examId && typeof item?.purchaseType === "string") {
       acc[examId] = item.purchaseType;
     }
     return acc;
   }, {});
+  const initialUnlockedExamIdSet = new Set(initialUnlockedExamIds);
+  const initialManualUnlockedExamIdSet = new Set(initialManualUnlockedExamIds);
   const paidExamPurchases = userUnlockedExams.filter(
     (item: any) => item?.purchaseType === "exam" && item?.paymentStatus === "completed",
   ).length;
@@ -491,27 +526,42 @@ export function ManageUserModal({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {examItems.map((exam: any) => {
-                    const purchaseType = unlockSourceByExamId[exam._id];
+                    const examId = normalizeExamId(exam?._id ?? exam?.id);
+                    if (!examId) return null;
+
+                    const isUnlocked = formData.unlockedExams.includes(examId);
+                    const purchaseType = unlockSourceByExamId[examId];
                     const isNonManualUnlock = Boolean(
-                      formData.unlockedExams.includes(exam._id) &&
-                      purchaseType &&
-                      purchaseType !== "manual",
+                      isUnlocked &&
+                      initialUnlockedExamIdSet.has(examId) &&
+                      !initialManualUnlockedExamIdSet.has(examId),
                     );
+                    const unlockStateLabel = !isUnlocked
+                      ? "Locked"
+                      : isNonManualUnlock
+                        ? `Unlocked (${purchaseType || "paid/plan"})`
+                        : "Unlocked (manual)";
 
                     return (
-                      <div key={exam._id} className="flex items-center space-x-2">
+                      <div key={examId} className="flex items-center space-x-2">
                         <Checkbox
-                          id={exam._id}
-                          checked={formData.unlockedExams.includes(exam._id)}
+                          id={examId}
+                          className="h-4 w-4 rounded-[4px] border-slate-300 bg-white data-[state=checked]:bg-[#1E3A8A] data-[state=checked]:border-[#1E3A8A]"
+                          checked={isUnlocked}
                           disabled={isNonManualUnlock}
-                          onCheckedChange={(checked) => toggleExam(exam._id, checked === true)}
+                          onCheckedChange={(checked) => toggleExam(examId, checked === true)}
                         />
-                        <Label
-                          htmlFor={exam._id}
-                          className={`text-sm cursor-pointer ${isNonManualUnlock ? "text-slate-400" : ""}`}
-                        >
-                          {exam.name}
-                        </Label>
+                        <div className="min-w-0">
+                          <Label
+                            htmlFor={examId}
+                            className={`text-sm cursor-pointer ${isNonManualUnlock ? "text-slate-400" : ""}`}
+                          >
+                            {exam.name}
+                          </Label>
+                          <p className={`text-xs ${isUnlocked ? "text-emerald-700" : "text-slate-500"}`}>
+                            {unlockStateLabel}
+                          </p>
+                        </div>
                       </div>
                     );
                   })}
@@ -575,7 +625,6 @@ export function ManageUserModal({
                   onCheckedChange={(checked) =>
                     setFormData({ ...formData, isActive: checked })
                   }
-                  // Custom color classes for the checked state
                   className="data-[state=checked]:bg-[#1E3A8A] data-[state=unchecked]:bg-slate-200"
                 />
                 <span
