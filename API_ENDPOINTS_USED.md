@@ -320,10 +320,10 @@ FormData: { email, phone, subject, description, attachment: File }
 
 ### Reply to Ticket (Admin)
 ```typescript
-supportAPI.replyToTicket(ticketId: string, message: string)
-GET /api/v1/support/{ticketId}/reply?message={text}
+supportAPI.replyToTicket(ticketId: string, formData: FormData)
+POST /api/v1/support/{ticketId}/reply
 Headers: Authorization: Bearer {admin_token}
-Query: { message }
+FormData: { message, attachment: File }
 ```
 
 ## Analytics APIs

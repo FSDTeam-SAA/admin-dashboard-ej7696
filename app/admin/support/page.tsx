@@ -144,7 +144,9 @@ export default function SupportPage() {
       if (!trimmed) {
         throw new Error("Message is required");
       }
-      return supportAPI.replyToTicket(selectedTicketId, trimmed);
+      const formData = new FormData();
+      formData.append("message", trimmed);
+      return supportAPI.replyToTicket(selectedTicketId, formData);
     },
     {
       onSuccess: () => {
@@ -241,12 +243,6 @@ export default function SupportPage() {
                         <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">
                           {ticket.subject}
                         </h3>
-                        <Badge
-                          variant="outline"
-                          className={statusBadgeClass(ticket.status)}
-                        >
-                          {ticket.status}
-                        </Badge>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 line-clamp-1">
                         {ticket.email}
@@ -278,12 +274,6 @@ export default function SupportPage() {
                   <h2 className="text-lg font-semibold text-gray-900">
                     {activeTicket.subject}
                   </h2>
-                  <Badge
-                    variant="outline"
-                    className={statusBadgeClass(activeTicket.status)}
-                  >
-                    {activeTicket.status}
-                  </Badge>
                 </div>
                 <div className="text-sm text-gray-500">
                   {activeTicket.email}
