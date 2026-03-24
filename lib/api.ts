@@ -364,9 +364,9 @@ export const supportAPI = {
   getTicketDetails: (ticketId: string) =>
     axiosInstance.get(`/api/v1/support/${ticketId}`),
 
-  replyToTicket: (ticketId: string, formData: FormData) =>
-    axiosInstance.post(`/api/v1/support/${ticketId}/reply`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  replyToTicket: (ticketId: string, message: string) =>
+    axiosInstance.get(`/api/v1/support/${ticketId}/reply`, {
+      params: { message },
     }),
 };
 

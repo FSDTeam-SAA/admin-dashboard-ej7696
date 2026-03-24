@@ -144,9 +144,7 @@ export default function SupportPage() {
       if (!trimmed) {
         throw new Error("Message is required");
       }
-      const formData = new FormData();
-      formData.append("message", trimmed);
-      return supportAPI.replyToTicket(selectedTicketId, formData);
+      return supportAPI.replyToTicket(selectedTicketId, trimmed);
     },
     {
       onSuccess: () => {
