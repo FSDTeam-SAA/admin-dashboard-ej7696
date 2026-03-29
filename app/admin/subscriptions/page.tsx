@@ -73,13 +73,16 @@ export default function SubscriptionsPage() {
   const [examUnlockPrice, setExamUnlockPrice] = useState("");
   const [isReferralCommissionModalOpen, setIsReferralCommissionModalOpen] =
     useState(false);
-  const [referralCommissionPercent, setReferralCommissionPercent] = useState("");
+  const [referralCommissionPercent, setReferralCommissionPercent] =
+    useState("");
 
-  const { data: pricingData, isLoading, refetch } = useQuery(
-    "pricing-settings",
-    paymentAPI.getPricingSettings,
-    { keepPreviousData: true }
-  );
+  const {
+    data: pricingData,
+    isLoading,
+    refetch,
+  } = useQuery("pricing-settings", paymentAPI.getPricingSettings, {
+    keepPreviousData: true,
+  });
 
   const pricing = pricingData?.data?.data;
   const hideAddNewPlan = Number(pricing?.professionalPlanPrice) === 170;
@@ -99,9 +102,10 @@ export default function SubscriptionsPage() {
 
         const proPrice = Number(pricing?.professionalPlanPrice ?? 180);
         const proIntervalCount = Number(
-          pricing?.professionalPlanIntervalCount ?? 3
+          pricing?.professionalPlanIntervalCount ?? 3,
         );
-        const proIntervalUnit = pricing?.professionalPlanIntervalUnit ?? "months";
+        const proIntervalUnit =
+          pricing?.professionalPlanIntervalUnit ?? "months";
         const proFeatures = Array.isArray(pricing?.professionalPlanFeatures)
           ? pricing.professionalPlanFeatures
           : defaultProFeatures;
@@ -115,7 +119,8 @@ export default function SubscriptionsPage() {
             : 3,
           professionalPlanIntervalUnit: proIntervalUnit,
           professionalPlanDescription:
-            pricing?.professionalPlanDescription || "What's included in your plan",
+            pricing?.professionalPlanDescription ||
+            "What's included in your plan",
           professionalPlanFeatures: proFeatures,
         });
       },
@@ -128,7 +133,7 @@ export default function SubscriptionsPage() {
         onError: (error: any) => {
           toast.error(error?.message || "Failed to update exam unlock price");
         },
-      }
+      },
     );
 
   const {
@@ -158,12 +163,14 @@ export default function SubscriptionsPage() {
       onError: (error: any) => {
         toast.error(error?.message || "Failed to update referral commission");
       },
-    }
+    },
   );
 
   const plans = useMemo<PlanCard[]>(() => {
     const proPrice = Number(pricing?.professionalPlanPrice ?? 180);
-    const proIntervalCount = Number(pricing?.professionalPlanIntervalCount ?? 3);
+    const proIntervalCount = Number(
+      pricing?.professionalPlanIntervalCount ?? 3,
+    );
     const proIntervalUnit = pricing?.professionalPlanIntervalUnit ?? "months";
     const proFeatures = Array.isArray(pricing?.professionalPlanFeatures)
       ? pricing.professionalPlanFeatures
@@ -190,15 +197,17 @@ export default function SubscriptionsPage() {
         price: Number.isFinite(proPrice) ? proPrice : 180,
         duration: normalizeDuration(
           Number.isFinite(proIntervalCount) ? proIntervalCount : 3,
-          proIntervalUnit
+          proIntervalUnit,
         ),
         items: (proFeatures.length ? proFeatures : defaultProFeatures).map(
           (text: string, index: number) => ({
             id: `pro-${index}`,
             text,
-          })
+          }),
         ),
-        note: pricing?.professionalPlanDescription || "What's included in your plan",
+        note:
+          pricing?.professionalPlanDescription ||
+          "What's included in your plan",
         status: "Active",
         accent: "pro",
         editable: true,
@@ -232,34 +241,39 @@ export default function SubscriptionsPage() {
     <div className="min-h-screen bg-[#F5F8FF] p-4 md:p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Flexible Plan</h1>
-          <p className="text-sm text-slate-500">Create a plan that works best for you</p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Flexible Plan
+          </h1>
+          <p className="text-sm text-slate-500">
+            Create a plan that works best for you
+          </p>
         </div>
-        <Button
-          className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
-          onClick={handleOpenReferralCommission}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Referral Commission ({currentReferralCommissionPercent}%)
-        </Button>
-        <Button
-          className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
-          onClick={handleOpenExamPrice}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Exam Unlock Price
-        </Button>
-
-        {plans.professionalPlanPrice > 0 && !hideAddNewPlan && (
+        <div className="space-x-2">
           <Button
             className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
-            onClick={handleOpenAdd}
+            onClick={handleOpenReferralCommission}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add New Plan
+            Referral Commission ({currentReferralCommissionPercent}%)
           </Button>
-        )}
-        
+          <Button
+            className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
+            onClick={handleOpenExamPrice}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Exam Unlock Price
+          </Button>
+
+          {plans.professionalPlanPrice > 0 && !hideAddNewPlan && (
+            <Button
+              className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
+              onClick={handleOpenAdd}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Plan
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 max-w-5xl">
@@ -302,7 +316,9 @@ export default function SubscriptionsPage() {
                   <span className="text-3xl font-bold text-slate-900">
                     {formatPrice(plan.price)}
                   </span>
-                  <span className="text-sm text-slate-500">/{plan.duration}</span>
+                  <span className="text-sm text-slate-500">
+                    /{plan.duration}
+                  </span>
                 </div>
 
                 <div className="mt-4 h-px w-full bg-slate-200" />

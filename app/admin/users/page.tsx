@@ -94,14 +94,6 @@ export default function UserManagementPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 rounded-full px-5"
-              onClick={() => toast.info("Export coming soon")}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Users ( CSV )
-            </Button>
-            <Button
               className="bg-blue-700 hover:bg-blue-800 text-white rounded-full px-5"
               onClick={() => setIsAddModalOpen(true)}
             >

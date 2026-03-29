@@ -280,14 +280,6 @@ export default function AdminDashboard() {
             Welcome back to your admin panel
           </p>
         </div>
-
-        <Button
-          variant="outline"
-          className="border-slate-200 bg-white text-slate-600 gap-2 hover:bg-slate-50 h-10 px-6"
-          onClick={() => toast.info("Add your filter action here")}
-        >
-          <Filter className="w-4 h-4" /> Filter
-        </Button>
       </div>
 
       {/* Stats Grid */}

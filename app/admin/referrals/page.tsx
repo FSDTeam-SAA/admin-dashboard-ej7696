@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 type ReferralListType = "shared" | "used";
+type ReferralSection = "shared" | "used" | "payouts";
 type PayoutFilterStatus = "all" | "pending" | "approved" | "rejected" | "paid";
 type PayoutStatusUpdate = "approved" | "rejected" | "paid";
 
@@ -35,6 +36,7 @@ const isFinalizedPayoutStatus = (status: string) =>
 export default function ReferralsAdminPage() {
   const queryClient = useQueryClient();
   const [listType, setListType] = useState<ReferralListType>("shared");
+  const [activeSection, setActiveSection] = useState<ReferralSection>("shared");
   const [page, setPage] = useState(1);
   const [payoutPage, setPayoutPage] = useState(1);
   const [payoutStatus, setPayoutStatus] = useState<PayoutFilterStatus>("all");
@@ -52,7 +54,11 @@ export default function ReferralsAdminPage() {
     isLoading: loadingList,
     refetch: refetchList,
   } = useQuery(["referral-admin-list", listType, page], () =>
-    referralAPI.listAdminRelationships(page, limit, listType)
+    referralAPI.listAdminRelationships(page, limit, listType),
+    {
+      enabled: activeSection !== "payouts",
+      keepPreviousData: true,
+    }
   );
 
   const {
@@ -64,7 +70,11 @@ export default function ReferralsAdminPage() {
       payoutPage,
       limit,
       payoutStatus === "all" ? undefined : payoutStatus
-    )
+    ),
+    {
+      enabled: activeSection === "payouts",
+      keepPreviousData: true,
+    }
   );
 
   const payoutMutation = useMutation(
@@ -98,12 +108,19 @@ export default function ReferralsAdminPage() {
   const payoutMeta = payoutPayload?.meta || { page: 1, totalPages: 1, total: 0 };
 
   const reloadAll = async () => {
-    await Promise.all([refetchOverview(), refetchList(), refetchPayouts()]);
+    const jobs = [refetchOverview()];
+    if (activeSection === "payouts") {
+      jobs.push(refetchPayouts());
+    } else {
+      jobs.push(refetchList());
+    }
+    await Promise.all(jobs);
   };
 
   const switchList = (nextType: ReferralListType) => {
     setPage(1);
     setListType(nextType);
+    setActiveSection(nextType);
   };
 
   const updatePayoutStatus = async (requestId: string, status: PayoutStatusUpdate) => {
@@ -120,9 +137,6 @@ export default function ReferralsAdminPage() {
             Completed referral conversion summary (payment-success only).
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={reloadAll}>
-          Refresh
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -150,7 +164,7 @@ export default function ReferralsAdminPage() {
         <button
           type="button"
           className={ 
-            listType === "shared"
+            activeSection === "shared"
               ? "!bg-[#1E3A8A] !text-white !border-[#1E3A8A] p-2 rounded-md"
               : "!bg-gray-200 !text-[#1E3A8A] !border-[#1E3A8A] hover:!bg-[#E5EEFF] p-2 rounded-md"
           }
@@ -161,7 +175,7 @@ export default function ReferralsAdminPage() {
         <button
           type="button"
           className={
-            listType === "used"
+            activeSection === "used"
               ? "!bg-[#1E3A8A] !text-white !border-[#1E3A8A] p-2 rounded-md"
               : "!bg-gray-200 !text-[#1E3A8A] !border-[#1E3A8A] hover:!bg-[#E5EEFF] p-2 rounded-md"
           }
@@ -169,8 +183,20 @@ export default function ReferralsAdminPage() {
         >
           Total Used Referrals
         </button>
+        <button
+          type="button"
+          className={
+            activeSection === "payouts"
+              ? "!bg-[#1E3A8A] !text-white !border-[#1E3A8A] p-2 rounded-md"
+              : "!bg-gray-200 !text-[#1E3A8A] !border-[#1E3A8A] hover:!bg-[#E5EEFF] p-2 rounded-md"
+          }
+          onClick={() => setActiveSection("payouts")}
+        >
+          Payout Requests
+        </button>
       </div>
 
+      {activeSection !== "payouts" && (
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">
@@ -256,7 +282,9 @@ export default function ReferralsAdminPage() {
           </div>
         </div>
       </Card>
+      )}
 
+      {activeSection === "payouts" && (
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-900">Payout Requests</h2>
@@ -381,6 +409,7 @@ export default function ReferralsAdminPage() {
           </div>
         </div>
       </Card>
+      )}
     </div>
   );
 }

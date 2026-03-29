@@ -174,9 +174,6 @@ export default function ResourcesCategoryAdminPage() {
           <Button onClick={openCreateModal} className="gap-2">
             <Plus className="h-4 w-4" /> Add Category
           </Button>
-          <Button variant="outline" onClick={() => refetch()} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Refresh
-          </Button>
         </div>
       </div>
 
