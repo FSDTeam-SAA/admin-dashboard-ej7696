@@ -204,9 +204,11 @@ export const paymentAPI = {
     axiosInstance.post(`/api/v1/payments/admin/exam/${examId}/lock`, data),
 
   updatePricing: (data: {
-    examUnlockPrice: number;
-    professionalPlanPrice: number;
-    currency: string;
+    examUnlockPrice?: number;
+    professionalPlanPrice?: number;
+    currency?: string;
+    referralCommissionRate?: number;
+    referralCommissionPercent?: number;
     professionalPlanIntervalCount?: number;
     professionalPlanIntervalUnit?: string;
     professionalPlanDescription?: string;

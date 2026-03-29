@@ -71,6 +71,9 @@ export default function SubscriptionsPage() {
   const [editingPlan, setEditingPlan] = useState<PlanCard | null>(null);
   const [isExamPriceModalOpen, setIsExamPriceModalOpen] = useState(false);
   const [examUnlockPrice, setExamUnlockPrice] = useState("");
+  const [isReferralCommissionModalOpen, setIsReferralCommissionModalOpen] =
+    useState(false);
+  const [referralCommissionPercent, setReferralCommissionPercent] = useState("");
 
   const { data: pricingData, isLoading, refetch } = useQuery(
     "pricing-settings",
@@ -80,6 +83,11 @@ export default function SubscriptionsPage() {
 
   const pricing = pricingData?.data?.data;
   const hideAddNewPlan = Number(pricing?.professionalPlanPrice) === 170;
+  const currentReferralCommissionPercent = useMemo(() => {
+    const rate = Number(pricing?.referralCommissionRate ?? 0.1);
+    if (!Number.isFinite(rate)) return 10;
+    return Math.round((rate * 100 + Number.EPSILON) * 100) / 100;
+  }, [pricing?.referralCommissionRate]);
 
   const { mutate: updateExamPrice, isLoading: isUpdatingExamPrice } =
     useMutation(
@@ -122,6 +130,36 @@ export default function SubscriptionsPage() {
         },
       }
     );
+
+  const {
+    mutate: updateReferralCommission,
+    isLoading: isUpdatingReferralCommission,
+  } = useMutation(
+    async () => {
+      const commissionPercent = Number(referralCommissionPercent);
+      if (
+        !Number.isFinite(commissionPercent) ||
+        commissionPercent < 0 ||
+        commissionPercent > 100
+      ) {
+        throw new Error("Referral commission must be between 0 and 100");
+      }
+
+      return paymentAPI.updatePricing({
+        referralCommissionPercent: commissionPercent,
+      });
+    },
+    {
+      onSuccess: () => {
+        toast.success("Referral commission updated");
+        setIsReferralCommissionModalOpen(false);
+        refetch();
+      },
+      onError: (error: any) => {
+        toast.error(error?.message || "Failed to update referral commission");
+      },
+    }
+  );
 
   const plans = useMemo<PlanCard[]>(() => {
     const proPrice = Number(pricing?.professionalPlanPrice ?? 180);
@@ -185,6 +223,11 @@ export default function SubscriptionsPage() {
     setIsExamPriceModalOpen(true);
   };
 
+  const handleOpenReferralCommission = () => {
+    setReferralCommissionPercent(String(currentReferralCommissionPercent));
+    setIsReferralCommissionModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F8FF] p-4 md:p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -192,6 +235,13 @@ export default function SubscriptionsPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Flexible Plan</h1>
           <p className="text-sm text-slate-500">Create a plan that works best for you</p>
         </div>
+        <Button
+          className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
+          onClick={handleOpenReferralCommission}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Referral Commission ({currentReferralCommissionPercent}%)
+        </Button>
         <Button
           className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
           onClick={handleOpenExamPrice}
@@ -350,6 +400,56 @@ export default function SubscriptionsPage() {
                 disabled={isUpdatingExamPrice}
               >
                 {isUpdatingExamPrice ? "Updating..." : "Update"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isReferralCommissionModalOpen}
+        onOpenChange={setIsReferralCommissionModalOpen}
+      >
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-lg font-semibold text-slate-900">
+              Update Referral Commission
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500">
+                Commission Percent
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={referralCommissionPercent}
+                  onChange={(e) => setReferralCommissionPercent(e.target.value)}
+                  className="h-10 rounded-lg border-slate-200"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                />
+                <span className="text-sm font-semibold text-slate-500">%</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsReferralCommissionModalOpen(false)}
+                className="h-10 rounded-full border-slate-300 px-6"
+                disabled={isUpdatingReferralCommission}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
+                onClick={() => updateReferralCommission()}
+                disabled={isUpdatingReferralCommission}
+              >
+                {isUpdatingReferralCommission ? "Updating..." : "Update"}
               </Button>
             </div>
           </div>

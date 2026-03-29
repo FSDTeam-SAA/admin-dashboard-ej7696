@@ -191,19 +191,6 @@ export default function SupportPage() {
               className="pl-10"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">Status</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">All</option>
-              <option value="open">Open</option>
-              <option value="pending">Pending</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
         </div>
       </Card>
 
