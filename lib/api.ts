@@ -336,6 +336,8 @@ export const referralAPI = {
     const query = buildQueryString({ page, limit, kind });
     return axiosInstance.get(`/api/v1/referrals/admin/relationships${query}`);
   },
+  deleteAdminRelationship: (relationshipId: string) =>
+    axiosInstance.delete(`/api/v1/referrals/admin/relationships/${relationshipId}`),
   listPayoutRequests: (page = 1, limit = 20, status?: string) => {
     const query = buildQueryString({ page, limit, status });
     return axiosInstance.get(`/api/v1/referrals/admin/payout-requests${query}`);

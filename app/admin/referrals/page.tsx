@@ -5,6 +5,17 @@ import { useMutation, useQuery, useQueryClient } from "react-query";
 import { referralAPI } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ReferralListType = "shared" | "used";
@@ -41,6 +52,11 @@ export default function ReferralsAdminPage() {
   const [payoutPage, setPayoutPage] = useState(1);
   const [payoutStatus, setPayoutStatus] = useState<PayoutFilterStatus>("all");
   const [activeRequestId, setActiveRequestId] = useState("");
+  const [deleteRelationshipId, setDeleteRelationshipId] = useState("");
+  const [deleteRelationshipLabel, setDeleteRelationshipLabel] = useState("");
+  const [isDeleteRelationshipModalOpen, setIsDeleteRelationshipModalOpen] = useState(false);
+  const [rejectRequestId, setRejectRequestId] = useState("");
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const limit = 10;
 
   const {
@@ -99,6 +115,23 @@ export default function ReferralsAdminPage() {
     }
   );
 
+  const deleteRelationshipMutation = useMutation(
+    async (relationshipId: string) => referralAPI.deleteAdminRelationship(relationshipId),
+    {
+      onSuccess: () => {
+        toast.success("Referral relationship deleted");
+        queryClient.invalidateQueries(["referral-admin-list"]);
+        queryClient.invalidateQueries(["referral-overview"]);
+        setIsDeleteRelationshipModalOpen(false);
+        setDeleteRelationshipId("");
+        setDeleteRelationshipLabel("");
+      },
+      onError: (error: any) => {
+        toast.error(error?.response?.data?.message || "Failed to delete referral relationship");
+      },
+    }
+  );
+
   const overview = overviewRes?.data?.data || {};
   const payload = listRes?.data?.data || {};
   const items = payload?.items || [];
@@ -126,6 +159,29 @@ export default function ReferralsAdminPage() {
   const updatePayoutStatus = async (requestId: string, status: PayoutStatusUpdate) => {
     setActiveRequestId(requestId);
     await payoutMutation.mutateAsync({ requestId, status });
+  };
+
+  const openRejectModal = (requestId: string) => {
+    setRejectRequestId(requestId);
+    setIsRejectModalOpen(true);
+  };
+
+  const confirmReject = async () => {
+    if (!rejectRequestId) return;
+    await updatePayoutStatus(rejectRequestId, "rejected");
+    setIsRejectModalOpen(false);
+    setRejectRequestId("");
+  };
+
+  const openDeleteRelationshipModal = (item: any) => {
+    setDeleteRelationshipId(item?.relationshipId || "");
+    setDeleteRelationshipLabel(item?.referred?.name || "this referral");
+    setIsDeleteRelationshipModalOpen(true);
+  };
+
+  const confirmDeleteRelationship = async () => {
+    if (!deleteRelationshipId) return;
+    await deleteRelationshipMutation.mutateAsync(deleteRelationshipId);
   };
 
   return (
@@ -215,18 +271,19 @@ export default function ReferralsAdminPage() {
                 <th className="text-left py-2">Joined</th>
                 <th className="text-left py-2">Used</th>
                 <th className="text-left py-2">Earnings</th>
+                <th className="text-left py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loadingList ? (
                 <tr>
-                  <td colSpan={6} className="py-4 text-slate-500">
+                  <td colSpan={7} className="py-4 text-slate-500">
                     Loading referral users...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-slate-500">
+                  <td colSpan={7} className="py-6 text-center text-slate-500">
                     {listType === "shared"
                       ? "No shared referrals found."
                       : "No used referrals found."}
@@ -251,6 +308,23 @@ export default function ReferralsAdminPage() {
                     <td className="py-2">{formatDate(item.joinedAt)}</td>
                     <td className="py-2">{formatDate(item.usedAt)}</td>
                     <td className="py-2">{formatMoney(item.totalEarnings || 0)}</td>
+                    <td className="py-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-slate-500 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            item?.isUsed
+                              ? "Used referrals cannot be deleted"
+                              : "Delete referral relationship"
+                          }
+                          disabled={Boolean(item?.isUsed) || deleteRelationshipMutation.isLoading}
+                          onClick={() => openDeleteRelationshipModal(item)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -370,9 +444,10 @@ export default function ReferralsAdminPage() {
                               variant="outline"
                               size="sm"
                               disabled={isActing}
-                              onClick={() => updatePayoutStatus(item._id, "rejected")}
+                              title="Reject payout request"
+                              onClick={() => openRejectModal(item._id)}
                             >
-                              Reject
+                              <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
                           </div>
                         )}
@@ -410,6 +485,65 @@ export default function ReferralsAdminPage() {
         </div>
       </Card>
       )}
+
+      <AlertDialog
+        open={isDeleteRelationshipModalOpen}
+        onOpenChange={(open) => {
+          setIsDeleteRelationshipModalOpen(open);
+          if (!open) {
+            setDeleteRelationshipId("");
+            setDeleteRelationshipLabel("");
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete referral relationship?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`This will delete ${deleteRelationshipLabel || "this referral"} permanently.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={deleteRelationshipMutation.isLoading}
+              onClick={confirmDeleteRelationship}
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={isRejectModalOpen}
+        onOpenChange={(open) => {
+          setIsRejectModalOpen(open);
+          if (!open) {
+            setRejectRequestId("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject payout request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the payout request as rejected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={payoutMutation.isLoading}
+              onClick={confirmReject}
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
