@@ -328,6 +328,9 @@ export const referralAPI = {
 
   // Admin
   getOverview: () => axiosInstance.get("/api/v1/referrals/admin/overview"),
+  getAdminTemplate: () => axiosInstance.get("/api/v1/referrals/admin/template"),
+  updateAdminTemplate: (data: { template: string }) =>
+    axiosInstance.patch("/api/v1/referrals/admin/template", data),
   listAdminRelationships: (
     page = 1,
     limit = 20,
@@ -572,6 +575,8 @@ export const api = {
 
   // Referrals (Admin)
   getReferralOverview: referralAPI.getOverview,
+  getReferralTemplate: referralAPI.getAdminTemplate,
+  updateReferralTemplate: referralAPI.updateAdminTemplate,
   listReferralPayoutRequests: referralAPI.listPayoutRequests,
   updateReferralPayoutRequestStatus: referralAPI.updatePayoutRequestStatus,
 };

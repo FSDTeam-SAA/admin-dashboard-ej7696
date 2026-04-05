@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { ChangePasswordModal } from "@/components/admin/settings/profile-forms";
 import { toast } from "sonner";
 import {
@@ -104,6 +105,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
+  const [isReferralTemplateModalOpen, setIsReferralTemplateModalOpen] =
+    useState(false);
+  const [referralTemplate, setReferralTemplate] = useState("");
+  const [initialReferralTemplate, setInitialReferralTemplate] = useState("");
+  const [referralTemplateMaxLength, setReferralTemplateMaxLength] = useState(4000);
   const [hasShownForcePasswordPrompt, setHasShownForcePasswordPrompt] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AI_MODEL_OPTIONS[0].value);
   const [currentModel, setCurrentModel] = useState("");
@@ -132,6 +138,28 @@ export default function SettingsPage() {
     },
   });
 
+  const {
+    refetch: refetchReferralTemplate,
+    isFetching: isLoadingReferralTemplate,
+  } = useQuery(["admin-referral-template"], api.getReferralTemplate, {
+    enabled: false,
+    onSuccess: (response: any) => {
+      const data = response?.data?.data || {};
+      const template = typeof data?.template === "string" ? data.template : "";
+      const maxLength =
+        Number.isFinite(Number(data?.maxLength)) && Number(data.maxLength) > 0
+          ? Number(data.maxLength)
+          : 4000;
+
+      setReferralTemplate(template);
+      setInitialReferralTemplate(template);
+      setReferralTemplateMaxLength(maxLength);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to load referral template");
+    },
+  });
+
   const updateModelMutation = useMutation(updateModelRequest, {
     onSuccess: (_, modelName) => {
       setCurrentModel(modelName);
@@ -145,7 +173,33 @@ export default function SettingsPage() {
     },
   });
 
+  const updateReferralTemplateMutation = useMutation(
+    (template: string) => api.updateReferralTemplate({ template }),
+    {
+      onSuccess: (response: any) => {
+        const data = response?.data?.data || {};
+        const nextTemplate =
+          typeof data?.template === "string" ? data.template : referralTemplate;
+        const maxLength =
+          Number.isFinite(Number(data?.maxLength)) && Number(data.maxLength) > 0
+            ? Number(data.maxLength)
+            : referralTemplateMaxLength;
+
+        setReferralTemplate(nextTemplate);
+        setInitialReferralTemplate(nextTemplate);
+        setReferralTemplateMaxLength(maxLength);
+        queryClient.setQueryData(["admin-referral-template"], response);
+        toast.success("Referral template updated successfully");
+        setIsReferralTemplateModalOpen(false);
+      },
+      onError: (error: any) => {
+        toast.error(error?.response?.data?.message || "Failed to update referral template");
+      },
+    },
+  );
+
   const isUpdatingModel = updateModelMutation.isLoading;
+  const isUpdatingReferralTemplate = updateReferralTemplateMutation.isLoading;
 
   const profileInfo = useMemo(() => {
     const payload = profileData?.data?.data ?? profileData?.data ?? {};
@@ -269,6 +323,33 @@ export default function SettingsPage() {
     setIsModelModalOpen(false);
   };
 
+  const openReferralTemplateModal = () => {
+    setIsReferralTemplateModalOpen(true);
+    void refetchReferralTemplate();
+  };
+
+  const closeReferralTemplateModal = () => {
+    if (isUpdatingReferralTemplate) return;
+    setIsReferralTemplateModalOpen(false);
+    setReferralTemplate(initialReferralTemplate);
+  };
+
+  const handleUpdateReferralTemplate = (event: FormEvent) => {
+    event.preventDefault();
+
+    const nextTemplate = referralTemplate.replace(/\r\n/g, "\n").trim();
+    if (!nextTemplate) {
+      toast.error("Referral template is required");
+      return;
+    }
+    if (nextTemplate.length > referralTemplateMaxLength) {
+      toast.error(`Template cannot exceed ${referralTemplateMaxLength} characters`);
+      return;
+    }
+
+    updateReferralTemplateMutation.mutate(nextTemplate);
+  };
+
   const handleUpdateModel = (event: FormEvent) => {
     event.preventDefault();
 
@@ -292,6 +373,13 @@ export default function SettingsPage() {
           <p className="text-sm text-slate-500">Manage your settings</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            className="h-10 rounded-full border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
+            onClick={openReferralTemplateModal}
+          >
+            Update referral template
+          </Button>
           <Button
             variant="outline"
             className="h-10 rounded-full border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
@@ -505,6 +593,71 @@ export default function SettingsPage() {
         onClose={() => setIsPasswordModalOpen(false)}
         onSuccess={refetch}
       />
+
+      <Dialog
+        open={isReferralTemplateModalOpen}
+        onOpenChange={(open) => {
+          if (isUpdatingReferralTemplate) return;
+          setIsReferralTemplateModalOpen(open);
+          if (!open) {
+            setReferralTemplate(initialReferralTemplate);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle>Update Referral Template</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateReferralTemplate} className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">
+                Available placeholders:{" "}
+                <span className="font-medium text-slate-800">
+                  {"{referralCode}"}, {"{referralLink}"}, {"{discountPercent}"}, {"{commissionPercent}"}
+                </span>
+              </p>
+              <p className="text-xs text-slate-500">
+                These placeholders are automatically replaced for each user.
+              </p>
+              <Textarea
+                value={referralTemplate}
+                onChange={(event) => setReferralTemplate(event.target.value)}
+                disabled={isLoadingReferralTemplate || isUpdatingReferralTemplate}
+                className="min-h-[280px] resize-y"
+                placeholder="Write referral share message..."
+              />
+              <p className="text-right text-xs text-slate-500">
+                {referralTemplate.length}/{referralTemplateMaxLength}
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeReferralTemplateModal}
+                disabled={isUpdatingReferralTemplate}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoadingReferralTemplate || isUpdatingReferralTemplate}
+              >
+                {isLoadingReferralTemplate || isUpdatingReferralTemplate ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isLoadingReferralTemplate ? "Loading..." : "Updating..."}
+                  </>
+                ) : (
+                  "Update Template"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ Change AI Model Modal */}
       <Dialog

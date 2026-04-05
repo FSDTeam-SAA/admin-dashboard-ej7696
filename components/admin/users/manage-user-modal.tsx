@@ -196,12 +196,11 @@ export function ManageUserModal({
 
       const nextUnlockedSet = new Set(formData.unlockedExams);
       const initialUnlockedSet = new Set(initialUnlockedExamIds);
-      const initialManualSet = new Set(initialManualUnlockedExamIds);
 
       const newUnlocks = Array.from(nextUnlockedSet).filter(
         (examId) => !initialUnlockedSet.has(examId),
       );
-      const lockedManualExamIds = Array.from(initialManualSet).filter(
+      const lockedExamIds = Array.from(initialUnlockedSet).filter(
         (examId) => !nextUnlockedSet.has(examId),
       );
 
@@ -213,9 +212,9 @@ export function ManageUserModal({
         );
       }
 
-      if (lockedManualExamIds.length) {
+      if (lockedExamIds.length) {
         await Promise.all(
-          lockedManualExamIds.map((examId) =>
+          lockedExamIds.map((examId) =>
             paymentAPI.lockExamForUser(examId, { userId }),
           ),
         );
@@ -548,13 +547,12 @@ export function ManageUserModal({
                           id={examId}
                           className="h-4 w-4 rounded-[4px] border-slate-300 bg-white data-[state=checked]:bg-[#1E3A8A] data-[state=checked]:border-[#1E3A8A]"
                           checked={isUnlocked}
-                          disabled={isNonManualUnlock}
                           onCheckedChange={(checked) => toggleExam(examId, checked === true)}
                         />
                         <div className="min-w-0">
                           <Label
                             htmlFor={examId}
-                            className={`text-sm cursor-pointer ${isNonManualUnlock ? "text-slate-400" : ""}`}
+                            className="text-sm cursor-pointer"
                           >
                             {exam.name}
                           </Label>
