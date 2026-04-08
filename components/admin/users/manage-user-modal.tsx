@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "react-query";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -21,7 +21,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { api, examAPI, paymentAPI, userAPI } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { api, examAPI, paymentAPI, resourceAPI, userAPI } from "@/lib/api";
 import { Loader2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -46,9 +48,10 @@ const PERMISSIONS = [
   { id: "view_activity_logs", label: "View activity logs" },
   { id: "manual_exam_unlocks", label: "Manual exam unlocks" },
   { id: "credential_management", label: "Credential management" },
+  { id: "manage_resource_store", label: "Manage resource store" },
 ];
 
-const normalizeExamId = (value: unknown): string | null => {
+const normalizeId = (value: unknown): string | null => {
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
   }
@@ -77,6 +80,13 @@ const normalizeExamId = (value: unknown): string | null => {
   return null;
 };
 
+const getExamUnlockSourceLabel = (purchaseType?: string | null) => {
+  if (purchaseType === "manual") return "manual";
+  if (purchaseType === "plan") return "plan";
+  if (purchaseType === "exam") return "paid";
+  return "paid/plan";
+};
+
 interface ManageUserModalProps {
   isOpen: boolean;
   userId?: string;
@@ -94,6 +104,7 @@ export function ManageUserModal({
   onClose,
   onSuccess,
 }: ManageUserModalProps) {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     phone: "",
     fullName: "",
@@ -101,16 +112,35 @@ export function ManageUserModal({
     subscriptionTier: "Starter",
     permissions: [] as string[],
     unlockedExams: [] as string[],
+    unlockedResources: [] as string[],
     isActive: true,
     tempPassword: "",
   });
   const [initialUnlockedExamIds, setInitialUnlockedExamIds] = useState<string[]>([]);
   const [initialManualUnlockedExamIds, setInitialManualUnlockedExamIds] = useState<string[]>([]);
+  const [initialUnlockedResourceIds, setInitialUnlockedResourceIds] = useState<string[]>([]);
+  const [initialManualUnlockedResourceIds, setInitialManualUnlockedResourceIds] = useState<string[]>(
+    [],
+  );
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState("");
   const [activeInstallationId, setActiveInstallationId] = useState("");
   const [activeSessionId, setActiveSessionId] = useState("");
   const [isClearSessionDialogOpen, setIsClearSessionDialogOpen] = useState(false);
+
+  const { data: userDetailsData, isLoading: isUserDetailsLoading } = useQuery(
+    ["admin-user-details", userId],
+    () => userAPI.getUserDetails(userId || ""),
+    {
+      enabled: isOpen && Boolean(userId),
+      staleTime: 0,
+      refetchOnMount: "always",
+      onError: (error: any) => {
+        toast.error("Failed to load user details");
+        console.error("[v0] User details error:", error);
+      },
+    },
+  );
 
   const { data: examsData, isLoading: isExamsLoading } = useQuery(
     ["admin-exams-all"],
@@ -126,6 +156,22 @@ export function ManageUserModal({
 
   const examItems = examsData?.data?.data?.exams || [];
 
+  const { data: resourceProductsData, isLoading: isResourcesLoading } = useQuery(
+    ["admin-resource-products-all"],
+    () => resourceAPI.listProducts(),
+    {
+      enabled: isOpen,
+      onError: (error: any) => {
+        if (error?.response?.status !== 403) {
+          toast.error("Failed to load resources");
+        }
+        console.error("[v0] Resource products error:", error);
+      },
+    },
+  );
+
+  const resourceItems = resourceProductsData?.data?.data || [];
+
   const { data: examReviewsData, isLoading: isReviewsLoading } = useQuery(
     ["user-exam-reviews", userId],
     () => userAPI.getUserExamReviews(userId || ""),
@@ -139,12 +185,13 @@ export function ManageUserModal({
   );
 
   const examReviews = examReviewsData?.data?.data || [];
+  const resolvedUser = userDetailsData?.data?.data || user;
 
   useEffect(() => {
-    if (!isOpen || !user) return;
+    if (!isOpen || !resolvedUser) return;
     const name =
-      user.name ||
-      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      resolvedUser.name ||
+      [resolvedUser.firstName, resolvedUser.lastName].filter(Boolean).join(" ") ||
       "";
     const roleMap: Record<string, string> = {
       user: "User",
@@ -156,37 +203,54 @@ export function ManageUserModal({
       starter: "Starter",
       professional: "Professional",
     };
-    const unlockedExamIds = Array.isArray(user.unlockedExams)
-      ? user.unlockedExams
-          .map((e: any) => normalizeExamId(e?.examId))
+    const unlockedExamIds = Array.isArray(resolvedUser.unlockedExams)
+      ? resolvedUser.unlockedExams
+          .map((e: any) => normalizeId(e?.examId))
           .filter((examId: string | null): examId is string => Boolean(examId))
       : [];
-    const manualUnlockedExamIds = Array.isArray(user.unlockedExams)
-      ? user.unlockedExams
+    const manualUnlockedExamIds = Array.isArray(resolvedUser.unlockedExams)
+      ? resolvedUser.unlockedExams
           .filter((e: any) => e?.purchaseType === "manual")
-          .map((e: any) => normalizeExamId(e?.examId))
+          .map((e: any) => normalizeId(e?.examId))
           .filter((examId: string | null): examId is string => Boolean(examId))
+      : [];
+    const unlockedResourceIds = Array.isArray(resolvedUser.unlockedResources)
+      ? resolvedUser.unlockedResources
+          .map((resource: any) => normalizeId(resource?.productId))
+          .filter((resourceId: string | null): resourceId is string => Boolean(resourceId))
+      : [];
+    const manualUnlockedResourceIds = Array.isArray(resolvedUser.unlockedResources)
+      ? resolvedUser.unlockedResources
+          .filter(
+            (resource: any) =>
+              resource?.unlockMode === "manual" || resource?.isManual === true,
+          )
+          .map((resource: any) => normalizeId(resource?.productId))
+          .filter((resourceId: string | null): resourceId is string => Boolean(resourceId))
       : [];
 
     setInitialUnlockedExamIds(unlockedExamIds);
     setInitialManualUnlockedExamIds(manualUnlockedExamIds);
-    setPasswordChangeRequired(Boolean(user.mustChangePassword));
-    setActiveDeviceId(user.activeDeviceId || "");
-    setActiveInstallationId(user.activeInstallationId || "");
-    setActiveSessionId(user.activeSessionId || "");
+    setInitialUnlockedResourceIds(unlockedResourceIds);
+    setInitialManualUnlockedResourceIds(manualUnlockedResourceIds);
+    setPasswordChangeRequired(Boolean(resolvedUser.mustChangePassword));
+    setActiveDeviceId(resolvedUser.activeDeviceId || "");
+    setActiveInstallationId(resolvedUser.activeInstallationId || "");
+    setActiveSessionId(resolvedUser.activeSessionId || "");
     setFormData({
-      phone: user.phone || "",
+      phone: resolvedUser.phone || "",
       fullName: name,
-      role: roleMap[user.role] || "User",
-      subscriptionTier: tierMap[user.subscriptionTier] || "Starter",
-      permissions: Array.isArray(user.subAdminPermissions)
-        ? user.subAdminPermissions
+      role: roleMap[resolvedUser.role] || "User",
+      subscriptionTier: tierMap[resolvedUser.subscriptionTier] || "Starter",
+      permissions: Array.isArray(resolvedUser.subAdminPermissions)
+        ? resolvedUser.subAdminPermissions
         : [],
       unlockedExams: unlockedExamIds,
-      isActive: (user.status || "active") === "active",
+      unlockedResources: unlockedResourceIds,
+      isActive: (resolvedUser.status || "active") === "active",
       tempPassword: "",
     });
-  }, [isOpen, user]);
+  }, [isOpen, resolvedUser]);
 
   const { mutate: updateUser, isLoading } = useMutation(
     async () => {
@@ -203,25 +267,49 @@ export function ManageUserModal({
       const lockedExamIds = Array.from(initialUnlockedSet).filter(
         (examId) => !nextUnlockedSet.has(examId),
       );
+      const nextUnlockedResourceSet = new Set(formData.unlockedResources);
+      const initialUnlockedResourceSet = new Set(initialUnlockedResourceIds);
+      const newResourceUnlocks = Array.from(nextUnlockedResourceSet).filter(
+        (resourceId) => !initialUnlockedResourceSet.has(resourceId),
+      );
+      const lockedResourceIds = Array.from(initialUnlockedResourceSet).filter(
+        (resourceId) => !nextUnlockedResourceSet.has(resourceId),
+      );
 
       if (newUnlocks.length) {
-        await Promise.all(
-          newUnlocks.map((examId) =>
-            paymentAPI.unlockExamForUser(examId, { userId }),
-          ),
-        );
+        await paymentAPI.unlockExamsForUserBulk({
+          userId,
+          examIds: newUnlocks,
+        });
       }
 
       if (lockedExamIds.length) {
-        await Promise.all(
-          lockedExamIds.map((examId) =>
-            paymentAPI.lockExamForUser(examId, { userId }),
-          ),
-        );
+        await paymentAPI.lockExamsForUserBulk({
+          userId,
+          examIds: lockedExamIds,
+        });
+      }
+
+      if (newResourceUnlocks.length) {
+        await resourceAPI.unlockProductsForUserBulk({
+          userId,
+          productIds: newResourceUnlocks,
+        });
+      }
+
+      if (lockedResourceIds.length) {
+        await resourceAPI.lockProductsForUserBulk({
+          userId,
+          productIds: lockedResourceIds,
+        });
       }
     },
     {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries(["admin-user-details", userId]),
+          queryClient.invalidateQueries(["users"]),
+        ]);
         toast.success("User updated successfully");
         onSuccess?.();
         onClose();
@@ -240,7 +328,11 @@ export function ManageUserModal({
       await userAPI.setTemporaryPassword(userId, { password });
     },
     {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries(["admin-user-details", userId]),
+          queryClient.invalidateQueries(["users"]),
+        ]);
         toast.success("Temporary password set. User will be prompted to change it on next login.");
         setPasswordChangeRequired(true);
         setFormData((prev) => ({ ...prev, tempPassword: "" }));
@@ -259,7 +351,11 @@ export function ManageUserModal({
       return userAPI.clearInstallationSession(userId);
     },
     {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries(["admin-user-details", userId]),
+          queryClient.invalidateQueries(["users"]),
+        ]);
         setActiveDeviceId("");
         setActiveInstallationId("");
         setActiveSessionId("");
@@ -294,6 +390,17 @@ export function ManageUserModal({
     }));
   };
 
+  const toggleResource = (resourceId: string, isChecked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      unlockedResources: isChecked
+        ? prev.unlockedResources.includes(resourceId)
+          ? prev.unlockedResources
+          : [...prev.unlockedResources, resourceId]
+        : prev.unlockedResources.filter((item) => item !== resourceId),
+    }));
+  };
+
   const formatDateTime = (value?: string | Date | null) => {
     if (!value) return "N/A";
     const parsed = new Date(value);
@@ -301,16 +408,62 @@ export function ManageUserModal({
     return parsed.toLocaleString();
   };
 
-  const userUnlockedExams = Array.isArray(user?.unlockedExams) ? user.unlockedExams : [];
+  const formatDate = (value?: string | Date | null, fallback = "N/A") => {
+    if (!value) return fallback;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return fallback;
+    return parsed.toLocaleDateString();
+  };
+
+  const userUnlockedExams = Array.isArray(resolvedUser?.unlockedExams)
+    ? resolvedUser.unlockedExams
+    : [];
+  const unlockedResourceEntries = Array.isArray(resolvedUser?.unlockedResources)
+    ? resolvedUser.unlockedResources
+    : [];
+  const examAccessById = useMemo(
+    () =>
+      userUnlockedExams.reduce((acc: Record<string, any>, item: any) => {
+        const examId = normalizeId(item?.examId);
+        if (examId) {
+          acc[examId] = item;
+        }
+        return acc;
+      }, {}),
+    [userUnlockedExams],
+  );
   const unlockSourceByExamId = userUnlockedExams.reduce((acc: Record<string, string>, item: any) => {
-    const examId = normalizeExamId(item?.examId);
+    const examId = normalizeId(item?.examId);
     if (examId && typeof item?.purchaseType === "string") {
       acc[examId] = item.purchaseType;
     }
     return acc;
   }, {});
+  const resourceAccessByProductId = useMemo(
+    () =>
+      unlockedResourceEntries.reduce((acc: Record<string, any>, item: any) => {
+        const productId = normalizeId(item?.productId);
+        if (productId) {
+          acc[productId] = item;
+        }
+        return acc;
+      }, {}),
+    [unlockedResourceEntries],
+  );
+  const sortedResourceItems = useMemo(
+    () =>
+      [...resourceItems].sort((a: any, b: any) => {
+        const categoryA = String(a?.categoryId?.title || "").toLowerCase();
+        const categoryB = String(b?.categoryId?.title || "").toLowerCase();
+        if (categoryA !== categoryB) return categoryA.localeCompare(categoryB);
+        return String(a?.title || "").toLowerCase().localeCompare(String(b?.title || "").toLowerCase());
+      }),
+    [resourceItems],
+  );
   const initialUnlockedExamIdSet = new Set(initialUnlockedExamIds);
   const initialManualUnlockedExamIdSet = new Set(initialManualUnlockedExamIds);
+  const initialUnlockedResourceIdSet = new Set(initialUnlockedResourceIds);
+  const initialManualUnlockedResourceIdSet = new Set(initialManualUnlockedResourceIds);
   const paidExamPurchases = userUnlockedExams.filter(
     (item: any) => item?.purchaseType === "exam" && item?.paymentStatus === "completed",
   ).length;
@@ -324,7 +477,13 @@ export function ManageUserModal({
     .map((item: any) => item?.purchasedAt)
     .filter(Boolean)
     .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0];
-  const normalizedTier = (user?.subscriptionTier || "starter").toString().toLowerCase();
+  const manualResourceUnlocks = unlockedResourceEntries.filter(
+    (item: any) => item?.unlockMode === "manual" || item?.isManual === true,
+  ).length;
+  const paidOrPlanResourceUnlocks = unlockedResourceEntries.length - manualResourceUnlocks;
+  const normalizedTier = (resolvedUser?.subscriptionTier || "starter")
+    .toString()
+    .toLowerCase();
   const isProfessional = normalizedTier === "professional";
   const resolvedActiveDeviceId = activeDeviceId || activeInstallationId;
   const hasActiveDeviceSession = Boolean(
@@ -446,7 +605,7 @@ export function ManageUserModal({
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-slate-500">Signed up</p>
-                  <p className="font-semibold text-slate-800">{formatDateTime(user?.createdAt)}</p>
+                  <p className="font-semibold text-slate-800">{formatDateTime(resolvedUser?.createdAt)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-500">Current plan</p>
@@ -458,7 +617,7 @@ export function ManageUserModal({
                   <p className="text-xs font-medium text-slate-500">Plan started</p>
                   <p className="font-semibold text-slate-800">
                     {isProfessional
-                      ? formatDateTime(user?.subscriptionStartedAt)
+                      ? formatDateTime(resolvedUser?.subscriptionStartedAt)
                       : "N/A (Starter plan)"}
                   </p>
                 </div>
@@ -466,7 +625,7 @@ export function ManageUserModal({
                   <p className="text-xs font-medium text-slate-500">Plan expires</p>
                   <p className="font-semibold text-slate-800">
                     {isProfessional
-                      ? formatDateTime(user?.subscriptionExpiresAt)
+                      ? formatDateTime(resolvedUser?.subscriptionExpiresAt)
                       : "N/A (Starter plan)"}
                   </p>
                 </div>
@@ -525,9 +684,10 @@ export function ManageUserModal({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {examItems.map((exam: any) => {
-                    const examId = normalizeExamId(exam?._id ?? exam?.id);
+                    const examId = normalizeId(exam?._id ?? exam?.id);
                     if (!examId) return null;
 
+                    const existingExamAccess = examAccessById[examId];
                     const isUnlocked = formData.unlockedExams.includes(examId);
                     const purchaseType = unlockSourceByExamId[examId];
                     const isNonManualUnlock = Boolean(
@@ -538,7 +698,7 @@ export function ManageUserModal({
                     const unlockStateLabel = !isUnlocked
                       ? "Locked"
                       : isNonManualUnlock
-                        ? `Unlocked (${purchaseType || "paid/plan"})`
+                        ? `Unlocked (${getExamUnlockSourceLabel(purchaseType)})`
                         : "Unlocked (manual)";
 
                     return (
@@ -559,11 +719,249 @@ export function ManageUserModal({
                           <p className={`text-xs ${isUnlocked ? "text-emerald-700" : "text-slate-500"}`}>
                             {unlockStateLabel}
                           </p>
+                          {isUnlocked && existingExamAccess ? (
+                            <>
+                              <p className="text-[11px] text-slate-500">
+                                Unlock date: {formatDate(existingExamAccess?.unlockDate)}
+                              </p>
+                              <p
+                                className={`text-[11px] ${
+                                  existingExamAccess?.isExpired
+                                    ? "text-red-600"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                Expiry: {formatDate(existingExamAccess?.expiresAt, "No expiry")}
+                              </p>
+                            </>
+                          ) : null}
+                          {isUnlocked && !existingExamAccess ? (
+                            <p className="text-[11px] text-slate-500">
+                              Unlock will be applied when you save.
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Resource Access */}
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <Label>Resource Access</Label>
+                <p className="text-xs text-slate-500">
+                  Review unlocked resources and use the controls below to lock or unlock access.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                  Manual: {manualResourceUnlocks}
+                </Badge>
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                  Paid/plan: {paidOrPlanResourceUnlocks}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              {isUserDetailsLoading ? (
+                <p className="text-sm text-slate-500">Loading unlocked resources...</p>
+              ) : unlockedResourceEntries.length === 0 ? (
+                <p className="text-sm text-slate-500">No resources unlocked for this user.</p>
+              ) : (
+                <ScrollArea className="h-64 sm:h-72">
+                  <div className="space-y-3 pr-4">
+                    {unlockedResourceEntries.map((resource: any) => {
+                      const resourceKey =
+                        normalizeId(resource?.productId) ||
+                        resource?.productCode ||
+                        resource?.title;
+                      const isManual =
+                        resource?.unlockMode === "manual" || resource?.isManual === true;
+                      const sourceDetail = resource?.inheritedFromBundle
+                        ? `via ${resource?.sourceProductTitle || resource?.sourceProductCode || "bundle"}`
+                        : resource?.sourceProductTitle &&
+                            resource?.sourceProductTitle !== resource?.title
+                          ? `from ${resource.sourceProductTitle}`
+                          : "";
+
+                      return (
+                        <div
+                          key={resourceKey}
+                          className="rounded-lg border border-slate-200 bg-slate-50/80 p-3"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-800">
+                                {resource?.title || resource?.productCode || "Resource"}
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Badge
+                                  className={
+                                    isManual
+                                      ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                      : "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                                  }
+                                >
+                                  {isManual ? "Manual" : "Paid/plan-based"}
+                                </Badge>
+                                {resource?.categoryTitle ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-slate-200 text-slate-600"
+                                  >
+                                    {resource.categoryTitle}
+                                  </Badge>
+                                ) : null}
+                                {resource?.isBundle ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-slate-200 text-slate-600"
+                                  >
+                                    Bundle
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 text-xs text-slate-600">
+                                {resource?.sourceLabel || (isManual ? "Manual unlock" : "Paid/plan-based")}
+                                {sourceDetail ? ` ${sourceDetail}` : ""}
+                              </p>
+                            </div>
+                            <div className="text-xs text-slate-500 sm:text-right">
+                              <p>Unlock date: {formatDate(resource?.purchasedAt)}</p>
+                              <p className="mt-1">
+                                Expiry: {formatDate(resource?.expiresAt, "No expiry")}
+                              </p>
+                              {resource?.provider ? (
+                                <p className="mt-1 uppercase tracking-wide">
+                                  {resource.provider}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-slate-800">
+                  Lock or unlock resources
+                </p>
+                <p className="text-xs text-slate-500">
+                  Changes are applied when you save the user.
+                </p>
+              </div>
+              {isResourcesLoading ? (
+                <p className="text-sm text-slate-500">Loading resources...</p>
+              ) : sortedResourceItems.length === 0 ? (
+                <p className="text-sm text-slate-500">No resources found.</p>
+              ) : (
+                <ScrollArea className="h-72 sm:h-80">
+                  <div className="grid grid-cols-1 gap-3 pr-4 sm:grid-cols-2">
+                    {sortedResourceItems.map((resource: any) => {
+                      const resourceId = normalizeId(resource?._id ?? resource?.id);
+                      if (!resourceId) return null;
+
+                      const existingAccess = resourceAccessByProductId[resourceId];
+                      const isUnlocked = formData.unlockedResources.includes(resourceId);
+                      const isNonManualUnlock = Boolean(
+                        isUnlocked &&
+                        initialUnlockedResourceIdSet.has(resourceId) &&
+                        !initialManualUnlockedResourceIdSet.has(resourceId),
+                      );
+                      const unlockStateLabel = !isUnlocked
+                        ? "Locked"
+                        : isNonManualUnlock
+                          ? `Unlocked (${existingAccess?.sourceLabel || "paid/plan-based"})`
+                          : "Unlocked (manual)";
+
+                      return (
+                        <div
+                          key={resourceId}
+                          className="flex items-start space-x-2 rounded-lg border border-white/70 bg-white/80 p-3"
+                        >
+                          <Checkbox
+                            id={`resource-${resourceId}`}
+                            className="mt-0.5 h-4 w-4 rounded-[4px] border-slate-300 bg-white data-[state=checked]:bg-[#1E3A8A] data-[state=checked]:border-[#1E3A8A]"
+                            checked={isUnlocked}
+                            onCheckedChange={(checked) =>
+                              toggleResource(resourceId, checked === true)
+                            }
+                          />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Label
+                                htmlFor={`resource-${resourceId}`}
+                                className="cursor-pointer text-sm"
+                              >
+                                {resource.title}
+                              </Label>
+                              {resource?.isBundle ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-slate-200 text-slate-600"
+                                >
+                                  Bundle
+                                </Badge>
+                              ) : null}
+                              {!resource?.isActive ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-orange-200 text-orange-700"
+                                >
+                                  Inactive
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {resource?.categoryId?.title ? (
+                              <p className="mt-1 text-xs text-slate-500">
+                                {resource.categoryId.title}
+                              </p>
+                            ) : null}
+                            <p
+                              className={`mt-1 text-xs ${
+                                isUnlocked ? "text-emerald-700" : "text-slate-500"
+                              }`}
+                            >
+                              {unlockStateLabel}
+                            </p>
+                            {isUnlocked && existingAccess ? (
+                              <>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  Unlock date: {formatDate(existingAccess?.purchasedAt)}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  Expiry: {formatDate(existingAccess?.expiresAt, "No expiry")}
+                                </p>
+                              </>
+                            ) : null}
+                            {isUnlocked && !existingAccess ? (
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Unlock will be applied when you save.
+                              </p>
+                            ) : null}
+                            {existingAccess?.inheritedFromBundle &&
+                            existingAccess?.sourceProductTitle ? (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Granted via {existingAccess.sourceProductTitle}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               )}
             </div>
           </div>
@@ -676,7 +1074,7 @@ export function ManageUserModal({
             </Button>
             <Button
               onClick={() => updateUser()}
-              disabled={isLoading}
+              disabled={isLoading || isUserDetailsLoading}
               className="ml-auto"
             >
               {isLoading ? (

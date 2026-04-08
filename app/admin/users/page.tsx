@@ -363,11 +363,13 @@ export default function UserManagementPage() {
               }).map((_, i) => (
                 <Button
                   key={i + 1}
-                  variant={currentPage === i + 1 ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(i + 1)}
                   className={
-                    currentPage === i + 1 ? "bg-blue-600 text-white" : ""
+                    currentPage === i + 1
+                      ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
+                      : ""
                   }
                 >
                   {i + 1}

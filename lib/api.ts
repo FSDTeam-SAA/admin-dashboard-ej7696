@@ -203,6 +203,12 @@ export const paymentAPI = {
   lockExamForUser: (examId: string, data: { userId: string }) =>
     axiosInstance.post(`/api/v1/payments/admin/exam/${examId}/lock`, data),
 
+  unlockExamsForUserBulk: (data: { userId: string; examIds: string[] }) =>
+    axiosInstance.post(`/api/v1/payments/admin/exams/unlock-bulk`, data),
+
+  lockExamsForUserBulk: (data: { userId: string; examIds: string[] }) =>
+    axiosInstance.post(`/api/v1/payments/admin/exams/lock-bulk`, data),
+
   updatePricing: (data: {
     examUnlockPrice?: number;
     professionalPlanPrice?: number;
@@ -300,6 +306,18 @@ export const resourceAPI = {
     ),
   deleteProduct: (productId: string) =>
     axiosInstance.delete(`/api/v1/resources/admin/products/${productId}`),
+
+  unlockProductForUser: (productId: string, data: { userId: string }) =>
+    axiosInstance.post(`/api/v1/resources/admin/products/${productId}/unlock`, data),
+
+  lockProductForUser: (productId: string, data: { userId: string }) =>
+    axiosInstance.post(`/api/v1/resources/admin/products/${productId}/lock`, data),
+
+  unlockProductsForUserBulk: (data: { userId: string; productIds: string[] }) =>
+    axiosInstance.post(`/api/v1/resources/admin/products/unlock-bulk`, data),
+
+  lockProductsForUserBulk: (data: { userId: string; productIds: string[] }) =>
+    axiosInstance.post(`/api/v1/resources/admin/products/lock-bulk`, data),
 
   listPurchases: (
     page = 1,
