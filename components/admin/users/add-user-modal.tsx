@@ -12,6 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
@@ -21,6 +28,14 @@ interface AddUserModalProps {
   onSuccess?: () => void;
 }
 
+type UserRole = 'user' | 'admin' | 'sub-admin';
+
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'user', label: 'User' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'sub-admin', label: 'Sub-Admin' },
+];
+
 export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +44,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
     email: '',
     phone: '',
     password: '',
+    role: 'user' as UserRole,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +56,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
     }
 
     setIsLoading(true);
+    const selectedRoleLabel = ROLE_OPTIONS.find((role) => role.value === formData.role)?.label ?? formData.role;
 
     try {
       const response = await authAPI.register({
@@ -57,12 +74,23 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
         response.data?.user?._id;
 
       if (createdUserId) {
+        if (formData.role !== 'user') {
+          try {
+            await authAPI.updateUserRole(createdUserId, { role: formData.role });
+          } catch (roleError) {
+            console.error('[v0] Update user role error:', roleError);
+            toast.warning(`User created, but the role could not be updated to ${selectedRoleLabel}`);
+          }
+        }
+
         try {
           await userAPI.clearInstallationSession(createdUserId);
         } catch (clearError) {
           console.error('[v0] Clear user installation session error:', clearError);
           toast.warning('User created, but the installation session could not be cleared');
         }
+      } else if (formData.role !== 'user') {
+        toast.warning('User created, but the role could not be updated because the user ID was not returned');
       }
 
       toast.success('User created successfully');
@@ -71,6 +99,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
         email: '',
         phone: '',
         password: '',
+        role: 'user',
       });
       onSuccess?.();
       onClose();
@@ -97,7 +126,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
             <Label htmlFor="fullName">Full Name</Label>
             <Input
               id="fullName"
-              placeholder="Butlar Mane"
+              placeholder=""
               value={formData.fullName}
               onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
               disabled={isLoading}
@@ -109,7 +138,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
             <Input
               id="email"
               type="email"
-              placeholder="butlar@email.com"
+              placeholder=""
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               disabled={isLoading}
@@ -120,7 +149,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
             <Label htmlFor="phone">Phone Number (Optional)</Label>
             <Input
               id="phone"
-              placeholder="+997 9384u35803"
+              placeholder=""
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               disabled={isLoading}
@@ -133,7 +162,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="********"
+                placeholder=""
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 disabled={isLoading}
@@ -152,7 +181,22 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
 
           <div className='space-y-2'>
             <Label htmlFor="role">Role</Label>
-            <Input id="role" value="User" disabled />
+            <Select
+              value={formData.role}
+              onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="role">
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                {ROLE_OPTIONS.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex gap-3 pt-4">
