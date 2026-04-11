@@ -61,9 +61,9 @@ const normalizeDuration = (count: number, unit: string) => {
 
 const mapDurationToSelect = (duration: string) => {
   const value = duration.toLowerCase();
-  if (value.includes("year")) return "Yearly";
-  if (value.includes("quarter") || value.includes("3")) return "Quarterly";
-  return "Monthly";
+  if (value.includes("6") || value.includes("six")) return "Six Months";
+  if (value.includes("3") || value.includes("three")) return "Three Months";
+  return "One Month";
 };
 
 export default function SubscriptionsPage() {
@@ -263,8 +263,8 @@ export default function SubscriptionsPage() {
             <Plus className="mr-2 h-4 w-4" />
             Exam Unlock Price
           </Button>
-
-          {plans.professionalPlanPrice > 0 && !hideAddNewPlan && (
+{/* 
+          {Number(pricing?.professionalPlanPrice ?? 0) > 0 && !hideAddNewPlan && (
             <Button
               className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
               onClick={handleOpenAdd}
@@ -272,7 +272,7 @@ export default function SubscriptionsPage() {
               <Plus className="mr-2 h-4 w-4" />
               Add New Plan
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -316,9 +316,11 @@ export default function SubscriptionsPage() {
                   <span className="text-3xl font-bold text-slate-900">
                     {formatPrice(plan.price)}
                   </span>
-                  <span className="text-sm text-slate-500">
-                    /{plan.duration}
-                  </span>
+                  {plan.duration ? (
+                    <span className="text-sm text-slate-500">
+                      /{plan.duration}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mt-4 h-px w-full bg-slate-200" />

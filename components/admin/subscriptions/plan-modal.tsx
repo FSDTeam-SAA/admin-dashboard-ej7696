@@ -54,7 +54,7 @@ export function AddPlanModal({
   const [formData, setFormData] = useState({
     name: planData?.name || '',
     price: planData?.price?.toString() || '',
-    duration: planData?.duration || 'Monthly',
+    duration: planData?.duration || 'One Month',
     items: planData?.items || [{ id: '1', text: '' }],
     note: planData?.note || '',
     status: planData?.status || 'Active',
@@ -66,7 +66,7 @@ export function AddPlanModal({
     setFormData({
       name: planData?.name || '',
       price: planData?.price?.toString() || '',
-      duration: planData?.duration || 'Monthly',
+      duration: planData?.duration || 'One Month',
       items: planData?.items || [{ id: '1', text: '' }],
       note: planData?.note || '',
       status: planData?.status || 'Active',
@@ -86,13 +86,16 @@ export function AddPlanModal({
   }, [newItemId, formData.items.length]);
 
   const toInterval = (duration: string) => {
-    const value = duration?.toString().toLowerCase() || 'monthly';
-    if (value.includes('year')) {
-      return { count: 1, unit: 'years' };
+    const value = duration?.toString().toLowerCase() || 'one month';
+
+    if (value.includes('6') || value.includes('six')) {
+      return { count: 6, unit: 'months' };
     }
-    if (value.includes('quarter') || value.includes('3')) {
+
+    if (value.includes('3') || value.includes('three')) {
       return { count: 3, unit: 'months' };
     }
+
     return { count: 1, unit: 'months' };
   };
 
@@ -231,11 +234,16 @@ export function AddPlanModal({
                   setFormData({ ...formData, duration: value })
                 }
               >
-                <SelectTrigger id="duration" className="mt-2 h-10 rounded-lg border-slate-200">
-                  <SelectValue />
+                <SelectTrigger
+                  id="duration"
+                  className="mt-2 h-10 rounded-lg border-slate-200"
+                >
+                  <SelectValue placeholder="Select duration" />
                 </SelectTrigger>
-                <SelectContent className='bg-white'>
-                  <SelectItem value="Quarterly">Quarterly</SelectItem>
+                <SelectContent className="bg-white">
+                  <SelectItem value="One Month">One Month</SelectItem>
+                  <SelectItem value="Three Months">Three Months</SelectItem>
+                  <SelectItem value="Six Months">Six Months</SelectItem>
                 </SelectContent>
               </Select>
             </div>
