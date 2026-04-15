@@ -51,6 +51,10 @@ interface QuestionBankQuestion {
   questionHash?: string;
   question?: string;
   options?: QuestionOption[];
+  explanation?: string;
+  category?: string;
+  tags?: string[];
+  batchNumber?: number;
 }
 
 interface QuestionBankQuestionMeta {
@@ -99,6 +103,8 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
   const [latestGeneration, setLatestGeneration] = useState<any | null>(null);
   const [questionPage, setQuestionPage] = useState(1);
   const [questionSearch, setQuestionSearch] = useState('');
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewSearch, setReviewSearch] = useState('');
 
   const examId = exam?._id;
 
@@ -148,12 +154,38 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
     }
   );
 
+  const {
+    data: reviewQuestionResponse,
+    isLoading: isReviewQuestionsLoading,
+    isFetching: isReviewQuestionsFetching,
+    refetch: refetchReviewQuestions,
+  } = useQuery(
+    ['exam-question-bank-review-questions', examId, reviewPage, reviewSearch],
+    () =>
+      examAPI.getQuestionBankReviewQuestions(examId as string, {
+        page: reviewPage,
+        limit: 10,
+        search: reviewSearch.trim() || undefined,
+      }),
+    {
+      enabled: isOpen && Boolean(examId),
+      keepPreviousData: true,
+      retry: 1,
+      onError: (error: any) => {
+        console.error('[v0] Question bank review questions error:', error);
+        toast.error(error?.response?.data?.message || 'Failed to load review questions');
+      },
+    }
+  );
+
   useEffect(() => {
     if (!isOpen || !examId) return;
     setFormData(DEFAULT_FORM);
     setLatestGeneration(null);
     setQuestionPage(1);
     setQuestionSearch('');
+    setReviewPage(1);
+    setReviewSearch('');
   }, [isOpen, examId]);
 
   useEffect(() => {
@@ -182,11 +214,14 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
         setLatestGeneration(data || null);
         if (data?.failed) {
           toast.error(data?.failureMessage || 'Question bank generation completed with failures');
+        } else if (data?.reviewRequired) {
+          toast.success('Questions generated for review. Approve them before saving to the database.');
         } else {
           toast.success('Question bank generation started/completed successfully');
         }
         refetchStatus();
         refetchQuestions();
+        refetchReviewQuestions();
       },
       onError: (error: any) => {
         console.error('[v0] Generate question bank error:', error);
@@ -230,6 +265,31 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
     ? questionData.questions
     : [];
   const questionMeta: QuestionBankQuestionMeta | null = questionData?.meta || null;
+  const reviewQuestionData = reviewQuestionResponse?.data?.data;
+  const reviewQuestionItems: QuestionBankQuestion[] = Array.isArray(reviewQuestionData?.questions)
+    ? reviewQuestionData.questions
+    : [];
+  const reviewQuestionMeta: QuestionBankQuestionMeta | null = reviewQuestionData?.meta || null;
+
+  const approveReviewMutation = useMutation(
+    () => examAPI.approveQuestionBankReview(examId as string),
+    {
+      onSuccess: (response: any) => {
+        const result = response?.data?.data;
+        toast.success(
+          `Saved ${toDisplayNumber(result?.savedQuestionCount)} reviewed question(s) to the database.`
+        );
+        setLatestGeneration(null);
+        refetchStatus();
+        refetchQuestions();
+        refetchReviewQuestions();
+      },
+      onError: (error: any) => {
+        console.error('[v0] Approve question bank review error:', error);
+        toast.error(error?.response?.data?.message || 'Failed to approve reviewed questions');
+      },
+    }
+  );
 
   useEffect(() => {
     setFormData((prev) => {
@@ -246,6 +306,7 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
   const handleRefreshAll = () => {
     refetchStatus();
     refetchQuestions();
+    refetchReviewQuestions();
   };
 
   const handleGenerate = () => {
@@ -305,9 +366,14 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
               variant="outline"
               size="sm"
               onClick={handleRefreshAll}
-              disabled={isStatusFetching || isQuestionsFetching || generateMutation.isLoading}
+              disabled={
+                isStatusFetching ||
+                isQuestionsFetching ||
+                isReviewQuestionsFetching ||
+                generateMutation.isLoading
+              }
             >
-              {isStatusFetching || isQuestionsFetching ? (
+              {isStatusFetching || isQuestionsFetching || isReviewQuestionsFetching ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -338,6 +404,12 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
               >
                 {(statusData?.lastBatchStatus || 'N/A').toString()}
               </span>
+            </div>
+            <div className="rounded-lg border bg-white p-3">
+              <p className="text-xs text-gray-500">Pending Review Questions</p>
+              <p className="text-xl font-semibold text-gray-900">
+                {toDisplayNumber(statusData?.pendingReviewQuestionCount)}
+              </p>
             </div>
           </div>
 
@@ -422,7 +494,7 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
               <p>
                 Validation flow:{' '}
                 <span className="font-semibold">
-                  Generate, auto validate, remove duplicates, store only approved.
+                  Generate, auto validate, remove duplicates, review, then save approved questions.
                 </span>
               </p>
               {targetAlreadyMet ? (
@@ -481,8 +553,26 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
                 Approved After Run: {toDisplayNumber(latestGeneration.approvedAfter)}
               </p>
               <p className="text-sm text-gray-700">
-                Inserted This Run: {toDisplayNumber(latestGeneration.insertedThisRun)}
+                Saved This Run: {toDisplayNumber(latestGeneration.insertedThisRun)}
               </p>
+              {latestGeneration.requiresReview ? (
+                <p className="text-sm text-gray-700">
+                  Ready for Review: {toDisplayNumber(
+                    Array.isArray(latestGeneration.batches)
+                      ? latestGeneration.batches.reduce(
+                          (total: number, batch: any) =>
+                            total + toDisplayNumber(batch?.stagedForReviewCount),
+                          0
+                        )
+                      : 0
+                  )}
+                </p>
+              ) : null}
+              {latestGeneration.requiresReview ? (
+                <p className="text-sm text-amber-700">
+                  Manual generation is now staged for review before database save.
+                </p>
+              ) : null}
               <p className="text-sm text-gray-700">
                 Executed Batches: {toDisplayNumber(latestGeneration.executedBatches)} /{' '}
                 {toDisplayNumber(latestGeneration.requestedBatches)}
@@ -502,6 +592,129 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
               ) : null}
             </div>
           ) : null}
+
+          <div className="rounded-lg border bg-white p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h4 className="font-semibold text-gray-900">Review Before Save</h4>
+                <p className="text-xs text-gray-600">
+                  Generated questions stay here until you approve saving them to the database.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchReviewQuestions()}
+                  disabled={isReviewQuestionsFetching || approveReviewMutation.isLoading}
+                >
+                  {isReviewQuestionsFetching ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Refresh
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => approveReviewMutation.mutate()}
+                  disabled={
+                    approveReviewMutation.isLoading ||
+                    toDisplayNumber(statusData?.pendingReviewQuestionCount) === 0
+                  }
+                >
+                  {approveReviewMutation.isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Approve and Save to DB'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <Input
+              value={reviewSearch}
+              onChange={(e) => {
+                setReviewPage(1);
+                setReviewSearch(e.target.value);
+              }}
+              placeholder="Search review questions by text, category, or tag"
+              disabled={approveReviewMutation.isLoading}
+            />
+
+            {isReviewQuestionsLoading ? (
+              <p className="text-sm text-gray-600">Loading review questions...</p>
+            ) : reviewQuestionItems.length === 0 ? (
+              <p className="text-sm text-gray-600">No staged review questions are waiting for approval.</p>
+            ) : (
+              <div className="max-h-[360px] space-y-2 overflow-y-auto">
+                {reviewQuestionItems.map((item, index) => (
+                  <div
+                    key={item.questionHash || item.questionId || `review-question-${index}`}
+                    className="rounded border p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {item.question || `Question ${index + 1}`}
+                      </p>
+                      <span className="text-[11px] font-medium text-blue-700">
+                        Batch {toDisplayNumber(item.batchNumber)}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {(item.options || []).map((option, optionIndex) => (
+                        <p
+                          key={`${item.questionHash || item.questionId || index}-review-option-${optionIndex}`}
+                          className={`text-xs ${
+                            option?.is_correct ? 'font-medium text-green-700' : 'text-gray-700'
+                          }`}
+                        >
+                          {option?.key ? `${option.key}. ` : ''}
+                          {option?.option || ''}
+                          {option?.is_correct ? ' (Correct)' : ''}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {reviewQuestionMeta ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Page {toDisplayNumber(reviewQuestionMeta.page)} of{' '}
+                  {toDisplayNumber(reviewQuestionMeta.totalPages)} | Total{' '}
+                  {toDisplayNumber(reviewQuestionMeta.total)}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReviewPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={!reviewQuestionMeta.hasPrevPage || isReviewQuestionsFetching}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReviewPage((prev) => prev + 1)}
+                    disabled={!reviewQuestionMeta.hasNextPage || isReviewQuestionsFetching}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           <div className="rounded-lg border bg-white p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">

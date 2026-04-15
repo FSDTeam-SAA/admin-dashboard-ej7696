@@ -145,6 +145,14 @@ export const examAPI = {
     return axiosInstance.get(`/api/v1/exam/${examId}/question-bank/questions${query}`);
   },
 
+  getQuestionBankReviewQuestions: (
+    examId: string,
+    params?: { page?: number; limit?: number; search?: string }
+  ) => {
+    const query = buildQueryString(params ?? {});
+    return axiosInstance.get(`/api/v1/exam/${examId}/question-bank/review-questions${query}`);
+  },
+
   generateQuestionBank: (
     examId: string,
     data: {
@@ -157,6 +165,9 @@ export const examAPI = {
     axiosInstance.post(`/api/v1/exam/${examId}/question-bank/generate`, data, {
       timeout: QUESTION_BANK_GENERATE_TIMEOUT_MS,
     }),
+
+  approveQuestionBankReview: (examId: string, data?: { batchIds?: string[] }) =>
+    axiosInstance.post(`/api/v1/exam/${examId}/question-bank/review-approve`, data ?? {}),
 };
 
 // ============ PAYMENT APIs ============

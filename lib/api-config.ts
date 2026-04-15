@@ -52,7 +52,9 @@ export const API_ENDPOINTS = {
     SUBMIT_EXAM: '/api/v1/exam/:examId/submit',
     GET_QUESTION_BANK_STATUS: '/api/v1/exam/:examId/question-bank/status',
     GET_QUESTION_BANK_QUESTIONS: '/api/v1/exam/:examId/question-bank/questions',
+    GET_QUESTION_BANK_REVIEW_QUESTIONS: '/api/v1/exam/:examId/question-bank/review-questions',
     GENERATE_QUESTION_BANK: '/api/v1/exam/:examId/question-bank/generate',
+    APPROVE_QUESTION_BANK_REVIEW: '/api/v1/exam/:examId/question-bank/review-approve',
   },
 
   // ============ PAYMENTS & REVENUE ============
