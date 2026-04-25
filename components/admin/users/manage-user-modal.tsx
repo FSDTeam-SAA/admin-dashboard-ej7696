@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, examAPI, paymentAPI, resourceAPI, userAPI } from "@/lib/api";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RefundModal } from "./refund-modal";
 
 const PERMISSIONS = [
   { id: "view_user_list", label: "View user list" },
@@ -87,6 +88,99 @@ const getExamUnlockSourceLabel = (purchaseType?: string | null) => {
   return "paid/plan";
 };
 
+const getRefundStatusBadge = (tx: any) => {
+  const refundStatus = tx.refundStatus;
+  const status = tx.status;
+  if (refundStatus === "full" || status === "refunded") {
+    return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-[10px]">Fully Refunded</Badge>;
+  }
+  if (refundStatus === "partial") {
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px]">Partially Refunded</Badge>;
+  }
+  if (status === "completed") {
+    return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-[10px]">Completed</Badge>;
+  }
+  return <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px]">{status ?? "—"}</Badge>;
+};
+
+function TransactionHistory({
+  userId,
+  formatDateTime,
+}: {
+  userId: string;
+  formatDateTime: (v?: string | Date | null) => string;
+}) {
+  const { data, isLoading } = useQuery(
+    ["user-transactions", userId],
+    () => paymentAPI.getUserTransactions(userId),
+    {
+      enabled: Boolean(userId),
+      staleTime: 0,
+      select: (res) => res.data?.data as any[],
+    }
+  );
+
+  const transactions: any[] = data ?? [];
+
+  if (!userId) return null;
+
+  return (
+    <div className="space-y-3">
+      <Label className="text-slate-700 font-bold">Transaction &amp; Refund History</Label>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        {isLoading ? (
+          <p className="text-sm text-slate-500">Loading transactions...</p>
+        ) : transactions.length === 0 ? (
+          <p className="text-sm text-slate-500">No transactions found.</p>
+        ) : (
+          <div className="space-y-3">
+            {transactions.map((tx: any) => {
+              const label =
+                tx.transactionType === "plan"
+                  ? `Plan Purchase${tx.examId?.name ? ` — ${tx.examId.name}` : ""}`
+                  : `Resource Purchase${tx.productId?.title ? ` — ${tx.productId.title}` : ""}`;
+              const paid = tx.totalAmount ?? tx.finalPrice ?? 0;
+              const refunded = tx.refundedAmount ?? 0;
+              const currency = tx.currency ?? "USD";
+              const history: any[] = tx.refundHistory ?? [];
+
+              return (
+                <div key={tx._id} className="rounded-lg border border-slate-100 p-3 text-sm space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-slate-800">{label}</span>
+                    {getRefundStatusBadge(tx)}
+                  </div>
+                  <div className="flex gap-4 text-xs text-slate-500">
+                    <span>Paid: <strong className="text-slate-700">{currency} ${paid.toFixed(2)}</strong></span>
+                    {refunded > 0 && (
+                      <span>Refunded: <strong className="text-amber-700">{currency} ${refunded.toFixed(2)}</strong></span>
+                    )}
+                    {tx.provider && <span className="uppercase">{tx.provider}</span>}
+                  </div>
+                  <p className="text-xs text-slate-400">{formatDateTime(tx.purchasedAt ?? tx.createdAt)}</p>
+                  {history.length > 0 && (
+                    <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                      <p className="text-xs font-medium text-slate-500">Refunds:</p>
+                      {history.map((entry: any, idx: number) => (
+                        <div key={entry._id ?? idx} className="flex items-center justify-between text-xs bg-slate-50 rounded px-2 py-1">
+                          <span className="text-slate-700">
+                            {currency} ${entry.amount?.toFixed(2)} — {entry.reason || "No reason"}
+                          </span>
+                          <span className="text-slate-400">{formatDateTime(entry.refundedAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface ManageUserModalProps {
   isOpen: boolean;
   userId?: string;
@@ -127,6 +221,7 @@ export function ManageUserModal({
   const [activeInstallationId, setActiveInstallationId] = useState("");
   const [activeSessionId, setActiveSessionId] = useState("");
   const [isClearSessionDialogOpen, setIsClearSessionDialogOpen] = useState(false);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
 
   const { data: userDetailsData, isLoading: isUserDetailsLoading } = useQuery(
     ["admin-user-details", userId],
@@ -600,7 +695,19 @@ export function ManageUserModal({
 
           {/* Billing & Subscription Summary */}
           <div className="space-y-3">
-            <Label className="text-slate-700 font-bold">Billing &amp; Subscription Summary</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-slate-700 font-bold">Billing &amp; Subscription Summary</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white"
+                onClick={() => setIsRefundModalOpen(true)}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Refund
+              </Button>
+            </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div>
@@ -1010,6 +1117,9 @@ export function ManageUserModal({
             </div>
           </div>
 
+          {/* Transaction & Refund History */}
+          <TransactionHistory userId={userId || ""} formatDateTime={formatDateTime} />
+
           {/* Account Status */}
           <div className="space-y-3">
             <Label className="text-slate-700 font-bold">Account Status</Label>
@@ -1112,6 +1222,15 @@ export function ManageUserModal({
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {userId && (
+        <RefundModal
+          isOpen={isRefundModalOpen}
+          userId={userId}
+          userName={userName}
+          onClose={() => setIsRefundModalOpen(false)}
+        />
+      )}
     </Dialog>
   );
 }

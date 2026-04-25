@@ -257,6 +257,19 @@ export const paymentAPI = {
     purchaseId: string,
     data: { status: "pending" | "completed" | "failed" | "cancelled" | "refunded"; reason?: string }
   ) => axiosInstance.patch(`/api/v1/payments/admin/plan-purchases/${purchaseId}/status`, data),
+
+  getUserTransactions: (userId: string) =>
+    axiosInstance.get(`/api/v1/payments/admin/users/${userId}/transactions`),
+
+  processRefund: (
+    transactionId: string,
+    data: { type: "full" | "partial"; amount?: number; reason: string; transactionType: "plan" | "resource" }
+  ) => axiosInstance.post(`/api/v1/payments/admin/transactions/${transactionId}/refund`, data),
+
+  getTransactionRefunds: (transactionId: string, transactionType: "plan" | "resource") =>
+    axiosInstance.get(`/api/v1/payments/admin/transactions/${transactionId}/refunds`, {
+      params: { transactionType },
+    }),
 };
 
 // ============ RESOURCE STORE APIs ============
@@ -575,6 +588,9 @@ export const api = {
   getPurchasesList: paymentAPI.getPurchasesList,
   getProfessionalPlanPurchases: paymentAPI.getProfessionalPlanPurchases,
   updateProfessionalPlanPurchaseStatus: paymentAPI.updateProfessionalPlanPurchaseStatus,
+  getUserTransactions: paymentAPI.getUserTransactions,
+  processRefund: paymentAPI.processRefund,
+  getTransactionRefunds: paymentAPI.getTransactionRefunds,
 
   // Announcements
   listAnnouncements: announcementAPI.listAnnouncements,
