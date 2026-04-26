@@ -123,7 +123,10 @@ export function RefundModal({ isOpen, userId, userName, onClose }: RefundModalPr
     }
   );
 
-  const transactions: Transaction[] = txData ?? [];
+  const allTransactions: Transaction[] = txData ?? [];
+  const transactions: Transaction[] = allTransactions.filter(
+    (tx) => tx.transactionType === "plan"
+  );
   const selectedTx = transactions.find((tx) => tx._id === selectedTxId) ?? null;
 
   const paidAmount = selectedTx ? (selectedTx.totalAmount ?? selectedTx.finalPrice ?? 0) : 0;
@@ -208,7 +211,7 @@ export function RefundModal({ isOpen, userId, userName, onClose }: RefundModalPr
                   Loading transactions...
                 </div>
               ) : transactions.length === 0 ? (
-                <p className="text-sm text-slate-500">No transactions found for this user.</p>
+                <p className="text-sm text-slate-500">No plan purchase transactions found for this user.</p>
               ) : (
                 <Select
                   value={selectedTxId}
