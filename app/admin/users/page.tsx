@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, Eye, Trash2, Download, Plus } from "lucide-react";
+import { Search, Eye, Trash2, Plus, RotateCcw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,18 +32,25 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"all" | "refunded">("all");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   const {
     data: usersData,
     isLoading,
     refetch,
   } = useQuery(
-    ["users", currentPage, selectedTier, selectedRole],
-    () =>
-      userAPI.listUsers(currentPage, 10, {
+    ["users", currentPage, selectedTier, selectedRole, viewMode],
+    () => {
+      const filters = {
         tier: selectedTier === "all" ? undefined : selectedTier,
         role: selectedRole === "all" ? undefined : selectedRole,
-      }),
+      };
+      return viewMode === "refunded"
+        ? userAPI.listRefundedUsers(currentPage, 10, filters)
+        : userAPI.listUsers(currentPage, 10, filters);
+    },
     {
       onError: (error: any) => {
         toast.error("Failed to load users");
@@ -54,16 +61,32 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = async () => {
     if (!selectedUserId) return;
-
     try {
       await userAPI.deleteUser(selectedUserId);
       toast.success("User deleted successfully");
       setIsDeleteDialogOpen(false);
+      const next = new Set(selectedUserIds);
+      next.delete(selectedUserId);
+      setSelectedUserIds(next);
       setSelectedUserId(null);
       refetch();
     } catch (error: any) {
       console.error("[v0] Delete user error:", error);
       toast.error("Failed to delete user");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const count = selectedUserIds.size;
+      await userAPI.bulkDeleteUsers([...selectedUserIds]);
+      toast.success(`${count} user(s) deleted successfully`);
+      setSelectedUserIds(new Set());
+      setIsBulkDeleteDialogOpen(false);
+      refetch();
+    } catch (error: any) {
+      console.error("[v0] Bulk delete error:", error);
+      toast.error("Failed to delete selected users");
     }
   };
 
@@ -80,6 +103,33 @@ export default function UserManagementPage() {
     );
   });
 
+  const allOnPageSelected =
+    filteredUsers.length > 0 &&
+    filteredUsers.every((u: any) => selectedUserIds.has(u._id));
+  const someOnPageSelected = filteredUsers.some((u: any) =>
+    selectedUserIds.has(u._id),
+  );
+
+  const handleSelectAll = (checked: boolean) => {
+    const next = new Set(selectedUserIds);
+    filteredUsers.forEach((u: any) =>
+      checked ? next.add(u._id) : next.delete(u._id),
+    );
+    setSelectedUserIds(next);
+  };
+
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    const next = new Set(selectedUserIds);
+    checked ? next.add(userId) : next.delete(userId);
+    setSelectedUserIds(next);
+  };
+
+  const switchViewMode = (mode: "all" | "refunded") => {
+    setViewMode(mode);
+    setCurrentPage(1);
+    setSelectedUserIds(new Set());
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -94,6 +144,20 @@ export default function UserManagementPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button
+              className={`rounded-full px-5 transition-colors ${
+                viewMode === "refunded"
+                  ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent"
+                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+              variant="outline"
+              onClick={() =>
+                switchViewMode(viewMode === "refunded" ? "all" : "refunded")
+              }
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              {viewMode === "refunded" ? "All Users" : "Refund Users"}
+            </Button>
+            <Button
               className="bg-blue-700 hover:bg-blue-800 text-white rounded-full px-5"
               onClick={() => setIsAddModalOpen(true)}
             >
@@ -104,14 +168,25 @@ export default function UserManagementPage() {
         </div>
 
         <div className="flex items-center justify-between gap-4">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Search users"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 rounded-xl"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <Input
+                placeholder="Search users"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 rounded-xl w-72"
+              />
+            </div>
+            {selectedUserIds.size > 0 && (
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 flex items-center gap-2"
+                onClick={() => setIsBulkDeleteDialogOpen(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedUserIds.size})
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -150,6 +225,19 @@ export default function UserManagementPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="py-4 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-blue-700"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate =
+                          someOnPageSelected && !allOnPageSelected;
+                    }}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
                   User
                 </th>
@@ -186,6 +274,9 @@ export default function UserManagementPage() {
                     key={i}
                     className="border-b border-gray-100 hover:bg-gray-50"
                   >
+                    <td className="py-4 px-4">
+                      <Skeleton className="w-4 h-4 rounded" />
+                    </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <Skeleton className="w-8 h-8 rounded-full" />
@@ -220,16 +311,30 @@ export default function UserManagementPage() {
                 ))
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-600">
-                    No users found
+                  <td colSpan={10} className="py-12 text-center text-gray-600">
+                    {viewMode === "refunded"
+                      ? "No refunded users found"
+                      : "No users found"}
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user: any) => (
                   <tr
                     key={user._id}
-                    className="border-b border-gray-100 hover:bg-gray-50"
+                    className={`border-b border-gray-100 hover:bg-gray-50 ${
+                      selectedUserIds.has(user._id) ? "bg-blue-50" : ""
+                    }`}
                   >
+                    <td className="py-4 px-4">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-blue-700"
+                        checked={selectedUserIds.has(user._id)}
+                        onChange={(e) =>
+                          handleSelectUser(user._id, e.target.checked)
+                        }
+                      />
+                    </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="w-8 h-8">
@@ -345,6 +450,11 @@ export default function UserManagementPage() {
               Showing {(currentPage - 1) * 10 + 1} to{" "}
               {Math.min(currentPage * 10, usersPayload?.meta?.total || 0)} of{" "}
               {usersPayload?.meta?.total || 0} results
+              {viewMode === "refunded" && (
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
+                  Refunded Users
+                </span>
+              )}
             </p>
             <div className="flex gap-2">
               <Button
@@ -435,6 +545,32 @@ export default function UserManagementPage() {
               className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
             >
               Yes, Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={isBulkDeleteDialogOpen}
+        onOpenChange={setIsBulkDeleteDialogOpen}
+      >
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedUserIds.size} user(s)?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All selected users will be
+              permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
+            >
+              Yes, Delete All
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

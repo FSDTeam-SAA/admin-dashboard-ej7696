@@ -92,6 +92,18 @@ export const userAPI = {
 
   deleteUser: (userId: string) =>
     axiosInstance.delete(`/api/v1/user/${userId}`),
+
+  bulkDeleteUsers: (ids: string[]) =>
+    axiosInstance.delete('/api/v1/user/bulk', { data: { ids } }),
+
+  listRefundedUsers: (
+    page = 1,
+    limit = 10,
+    filters?: { status?: string; role?: string; tier?: string }
+  ) => {
+    const query = buildQueryString({ page, limit, ...filters });
+    return axiosInstance.get(`/api/v1/user/refunded${query}`);
+  },
 };
 
 // ============ DASHBOARD APIs ============
