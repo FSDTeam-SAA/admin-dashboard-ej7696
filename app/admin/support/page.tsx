@@ -7,11 +7,19 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Search, Send } from "lucide-react";
+import { Loader2, Search, Send, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type SupportTicket = {
   _id: string;
@@ -59,39 +67,26 @@ const buildSenderName = (message: SupportMessage) => {
   return name;
 };
 
-const statusBadgeClass = (status?: string) => {
-  switch (status) {
-    case "open":
-      return "bg-green-100 text-green-700 border-green-200";
-    case "pending":
-      return "bg-amber-100 text-amber-700 border-amber-200";
-    case "closed":
-      return "bg-gray-100 text-gray-700 border-gray-200";
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
-  }
-};
-
 export default function SupportPage() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, searchTerm]);
+  }, [searchTerm]);
 
   const {
     data: ticketsData,
     isLoading: isTicketsLoading,
   } = useQuery(
-    ["support-tickets", currentPage, statusFilter, searchTerm],
+    ["support-tickets", currentPage, searchTerm],
     () =>
       supportAPI.listTickets(currentPage, 20, {
-        status: statusFilter === "all" ? undefined : statusFilter,
         search: searchTerm || undefined,
       }),
     {
@@ -162,6 +157,42 @@ export default function SupportPage() {
     }
   );
 
+  const bulkDeleteMutation = useMutation(
+    () => supportAPI.bulkDeleteTickets([...selectedIds]),
+    {
+      onSuccess: () => {
+        const count = selectedIds.size;
+        toast.success(`${count} ticket(s) deleted`);
+        setSelectedIds(new Set());
+        setIsBulkDeleteDialogOpen(false);
+        if (selectedTicketId && selectedIds.has(selectedTicketId)) {
+          setSelectedTicketId(null);
+        }
+        queryClient.invalidateQueries(["support-tickets"]);
+      },
+      onError: (error: any) => {
+        console.error("[Support] Bulk delete error:", error);
+        toast.error("Failed to delete selected tickets");
+      },
+    }
+  );
+
+  const allOnPageSelected =
+    tickets.length > 0 && tickets.every((t) => selectedIds.has(t._id));
+  const someOnPageSelected = tickets.some((t) => selectedIds.has(t._id));
+
+  const handleSelectAll = (checked: boolean) => {
+    const next = new Set(selectedIds);
+    tickets.forEach((t) => (checked ? next.add(t._id) : next.delete(t._id)));
+    setSelectedIds(next);
+  };
+
+  const handleSelectTicket = (ticketId: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    checked ? next.add(ticketId) : next.delete(ticketId);
+    setSelectedIds(next);
+  };
+
   const ticketCountLabel = useMemo(() => {
     if (!totalTickets) return "No tickets";
     const start = (currentPage - 1) * pageSize + 1;
@@ -182,22 +213,44 @@ export default function SupportPage() {
 
       <Card className="p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Search by subject, email, or phone"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative w-full md:max-w-md">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <Input
+                placeholder="Search by subject, email, or phone"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {selectedIds.size > 0 && (
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 flex items-center gap-2 shrink-0"
+                onClick={() => setIsBulkDeleteDialogOpen(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedIds.size})
+              </Button>
+            )}
           </div>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
         <Card className="overflow-hidden">
-          <div className="border-b px-4 py-3 text-sm font-semibold text-gray-700">
-            Tickets
+          <div className="border-b px-4 py-3 flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-blue-700 shrink-0"
+              checked={allOnPageSelected}
+              ref={(el) => {
+                if (el)
+                  el.indeterminate = someOnPageSelected && !allOnPageSelected;
+              }}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              disabled={isTicketsLoading || tickets.length === 0}
+            />
+            <span className="text-sm font-semibold text-gray-700">Tickets</span>
           </div>
           <ScrollArea className="h-[560px]">
             {isTicketsLoading ? (
@@ -218,25 +271,39 @@ export default function SupportPage() {
               <div className="divide-y">
                 {tickets.map((ticket) => {
                   const isActive = ticket._id === selectedTicketId;
+                  const isChecked = selectedIds.has(ticket._id);
                   return (
                     <div
                       key={ticket._id}
-                      onClick={() => setSelectedTicketId(ticket._id)}
-                      className={`w-full text-left px-4 py-4 transition cursor-pointer ${
-                        isActive ? "bg-blue-50" : "hover:bg-gray-50"
+                      className={`w-full text-left px-4 py-4 transition flex items-start gap-3 ${
+                        isActive ? "bg-blue-50" : isChecked ? "bg-blue-50/50" : "hover:bg-gray-50"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">
-                          {ticket.subject}
-                        </h3>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 mt-0.5 rounded border-gray-300 cursor-pointer accent-blue-700 shrink-0"
+                        checked={isChecked}
+                        onChange={(e) =>
+                          handleSelectTicket(ticket._id, e.target.checked)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setSelectedTicketId(ticket._id)}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">
+                            {ticket.subject}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                          {ticket.email}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-2">
+                          Updated {formatDate(ticket.lastMessageAt || ticket.createdAt)}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-1">
-                        {ticket.email}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        Updated {formatDate(ticket.lastMessageAt || ticket.createdAt)}
-                      </p>
                     </div>
                   );
                 })}
@@ -393,6 +460,33 @@ export default function SupportPage() {
           </div>
         </Card>
       )}
+
+      <AlertDialog
+        open={isBulkDeleteDialogOpen}
+        onOpenChange={setIsBulkDeleteDialogOpen}
+      >
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedIds.size} ticket(s)?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All selected support tickets and
+              their messages will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate()}
+              disabled={bulkDeleteMutation.isLoading}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
+            >
+              {bulkDeleteMutation.isLoading ? "Deleting..." : "Yes, Delete All"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
