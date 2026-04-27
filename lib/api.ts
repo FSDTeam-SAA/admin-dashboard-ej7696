@@ -429,6 +429,12 @@ export const supportAPI = {
     axiosInstance.post(`/api/v1/support/${ticketId}/reply`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+
+  deleteTicket: (ticketId: string) =>
+    axiosInstance.delete(`/api/v1/support/${ticketId}`),
+
+  bulkDeleteTickets: (ids: string[]) =>
+    axiosInstance.delete('/api/v1/support/bulk', { data: { ids } }),
 };
 
 // ============ ANALYTICS APIs ============
