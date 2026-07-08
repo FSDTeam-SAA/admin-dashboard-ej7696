@@ -40,6 +40,12 @@ const DEFAULT_FORM: GenerationFormData = {
   examType: 'closed_book',
 };
 
+const QUESTION_TYPE_WEIGHTS = [
+  { key: 'single_choice', label: 'Single choice', weight: 50 },
+  { key: 'true_false', label: 'True/false', weight: 30 },
+  { key: 'multiple_answer', label: 'Multiple answer', weight: 10 },
+];
+
 interface QuestionOption {
   key?: string;
   option?: string;
@@ -82,6 +88,34 @@ const calculateTotalBatches = (targetCount: number, batchSize: number) => {
   const safeTarget = Math.max(targetCount, 1);
   const safeBatchSize = Math.max(batchSize, 1);
   return Math.max(Math.ceil(safeTarget / safeBatchSize), 1);
+};
+
+const calculateQuestionTypeSplit = (totalQuestions: number) => {
+  const safeTotal = Math.max(Math.ceil(Number(totalQuestions) || 0), 0);
+  if (!safeTotal) return QUESTION_TYPE_WEIGHTS.map((item) => ({ ...item, count: 0 }));
+
+  const totalWeight = QUESTION_TYPE_WEIGHTS.reduce((total, item) => total + item.weight, 0);
+  const split = QUESTION_TYPE_WEIGHTS.map((item) => {
+    const exact = (safeTotal * item.weight) / totalWeight;
+    return { ...item, exact, count: Math.floor(exact) };
+  });
+
+  let assignedCount = split.reduce((total, item) => total + item.count, 0);
+  const byRemainder = [...split].sort((left, right) => {
+    const remainderDiff =
+      right.exact - Math.floor(right.exact) - (left.exact - Math.floor(left.exact));
+    if (remainderDiff !== 0) return remainderDiff;
+    return right.weight - left.weight;
+  });
+
+  let index = 0;
+  while (assignedCount < safeTotal && byRemainder.length > 0) {
+    byRemainder[index % byRemainder.length].count += 1;
+    assignedCount += 1;
+    index += 1;
+  }
+
+  return split.map(({ exact, ...item }) => item);
 };
 
 const getStatusClass = (status: string) => {
@@ -258,6 +292,10 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
     remainingToTarget > 0 ? calculateTotalBatches(remainingToTarget, batchSizeValue) : 0;
   const plannedBatchesThisRun = Math.min(maxBatchesPerRunValue, remainingBatchesToTarget);
   const plannedQuestionsThisRun = plannedBatchesThisRun * batchSizeValue;
+  const plannedQuestionTypeSplit = useMemo(
+    () => calculateQuestionTypeSplit(plannedQuestionsThisRun),
+    [plannedQuestionsThisRun]
+  );
   const targetAlreadyMet = remainingToTarget === 0;
 
   const questionData = questionResponse?.data?.data;
@@ -490,6 +528,14 @@ export function QuestionBankModal({ isOpen, onClose, exam }: QuestionBankModalPr
               <p>
                 This click will run up to <span className="font-semibold">{plannedBatchesThisRun}</span> batch(es)
                 and request about <span className="font-semibold">{plannedQuestionsThisRun}</span> question(s).
+              </p>
+              <p>
+                Type split:{' '}
+                <span className="font-semibold">
+                  {plannedQuestionTypeSplit
+                    .map((item) => `${item.label} ${item.count}`)
+                    .join(', ')}
+                </span>
               </p>
               <p>
                 Validation flow:{' '}
