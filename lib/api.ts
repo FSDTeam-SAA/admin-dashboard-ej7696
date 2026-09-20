@@ -248,6 +248,30 @@ export const paymentAPI = {
   getPricingSettings: () =>
     axiosInstance.get('/api/v1/payments/admin/pricing'),
 
+  startCoordinatedPriceUpdate: (data: {
+    target: 'professional_plan' | 'exam_unlock';
+    price: number;
+    currency?: 'USD';
+  }) =>
+    axiosInstance.post('/api/v1/payments/admin/pricing/coordinated-updates', data),
+
+  getCoordinatedPriceUpdates: (params?: {
+    target?: 'professional_plan' | 'exam_unlock';
+    limit?: number;
+  }) => {
+    const query = buildQueryString(params ?? {});
+    return axiosInstance.get(`/api/v1/payments/admin/pricing/coordinated-updates${query}`);
+  },
+
+  getCoordinatedPriceUpdate: (jobId: string) =>
+    axiosInstance.get(`/api/v1/payments/admin/pricing/coordinated-updates/${jobId}`),
+
+  deleteCoordinatedPriceUpdate: (jobId: string) =>
+    axiosInstance.delete(`/api/v1/payments/admin/pricing/coordinated-updates/${jobId}`),
+
+  retryCoordinatedPriceUpdate: (jobId: string) =>
+    axiosInstance.post(`/api/v1/payments/admin/pricing/coordinated-updates/${jobId}/retry`),
+
   getRevenueSummary: (params?: { range?: string }) => {
     const query = buildQueryString(params ?? {});
     return axiosInstance.get(`/api/v1/payments/admin/summary${query}`);

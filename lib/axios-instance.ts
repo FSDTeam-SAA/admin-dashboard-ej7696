@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import { getSession, signOut } from 'next-auth/react';
 import { getOrCreateInstallationId, INSTALLATION_ID_HEADER } from './installation-id';
 
@@ -27,20 +27,10 @@ const setHeader = (
   headers: AxiosRequestConfig['headers'] | undefined,
   headerName: string,
   headerValue: string
-) => {
-  if (!headerValue) {
-    return headers;
-  }
-
-  if (headers && typeof (headers as { set?: (name: string, value: string) => void }).set === 'function') {
-    (headers as { set: (name: string, value: string) => void }).set(headerName, headerValue);
-    return headers;
-  }
-
-  return {
-    ...(headers ?? {}),
-    [headerName]: headerValue,
-  };
+): AxiosRequestHeaders => {
+  const normalizedHeaders = new AxiosHeaders(headers as any);
+  if (headerValue) normalizedHeaders.set(headerName, headerValue);
+  return normalizedHeaders;
 };
 
 const getRefreshedSession = async () => {

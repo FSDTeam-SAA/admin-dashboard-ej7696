@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from 'react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useMutation } from 'react-query';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -51,6 +51,8 @@ export function AddPlanModal({
   isEdit = false,
 }: AddPlanModalProps) {
   const [newItemId, setNewItemId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState('');
+  const wasOpenRef = useRef(false);
   const [formData, setFormData] = useState({
     name: planData?.name || '',
     price: planData?.price?.toString() || '',
@@ -61,16 +63,19 @@ export function AddPlanModal({
   });
 
   useEffect(() => {
-    if (!isOpen) return;
-    setNewItemId(null);
-    setFormData({
-      name: planData?.name || '',
-      price: planData?.price?.toString() || '',
-      duration: planData?.duration || 'One Month',
-      items: planData?.items || [{ id: '1', text: '' }],
-      note: planData?.note || '',
-      status: planData?.status || 'Active',
-    });
+    if (isOpen && !wasOpenRef.current) {
+      setNewItemId(null);
+      setSubmitError('');
+      setFormData({
+        name: planData?.name || '',
+        price: planData?.price?.toString() || '',
+        duration: planData?.duration || 'One Month',
+        items: planData?.items || [{ id: '1', text: '' }],
+        note: planData?.note || '',
+        status: planData?.status || 'Active',
+      });
+    }
+    wasOpenRef.current = isOpen;
   }, [isOpen, planData]);
 
   useEffect(() => {
@@ -99,24 +104,16 @@ export function AddPlanModal({
     return { count: 1, unit: 'months' };
   };
 
-  const { data: pricingData } = useQuery(
-    'pricing-settings-modal',
-    paymentAPI.getPricingSettings,
-    { enabled: isOpen }
-  );
-  const pricing = pricingData?.data?.data;
-
   const { mutate: savePlan, isLoading } = useMutation(
     async () => {
+      setSubmitError('');
       const price = Number(formData.price);
       const features = formData.items
         .map((item) => item.text?.toString().trim())
         .filter(Boolean);
       const { count, unit } = toInterval(formData.duration);
 
-      return paymentAPI.updatePricing({
-        examUnlockPrice: Number(pricing?.examUnlockPrice ?? 150),
-        professionalPlanPrice: price,
+      await paymentAPI.updatePricing({
         professionalPlanIntervalCount: count,
         professionalPlanIntervalUnit: unit,
         professionalPlanDescription:
@@ -124,17 +121,40 @@ export function AddPlanModal({
         professionalPlanFeatures: features,
         currency: 'USD',
       });
+
+      const originalPrice = Number(planData?.price);
+      const priceChanged =
+        !Number.isFinite(originalPrice) ||
+        Math.abs(price - originalPrice) >= 0.005;
+
+      if (!priceChanged) {
+        return { priceUpdateStarted: false };
+      }
+
+      await paymentAPI.startCoordinatedPriceUpdate({
+        target: 'professional_plan',
+        price,
+        currency: 'USD',
+      });
+      return { priceUpdateStarted: true };
     },
     {
-      onSuccess: () => {
+      onSuccess: ({ priceUpdateStarted }) => {
         toast.success(
-          isEdit ? 'Plan updated successfully' : 'Plan created successfully'
+          priceUpdateStarted
+            ? 'Plan saved and coordinated price update started'
+            : 'Plan details saved; store price was unchanged'
         );
         onSuccess?.();
         onClose();
       },
       onError: (error: any) => {
-        toast.error(error?.response?.data?.message || 'Failed to save plan');
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to save plan';
+        setSubmitError(message);
+        toast.error(message);
       },
     }
   );
@@ -211,15 +231,24 @@ export function AddPlanModal({
                 <span className="text-sm font-semibold text-slate-500">$</span>
                 <Input
                   id="price"
-                  type="number"
-                  placeholder="500"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="29.99"
                   value={formData.price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!/^\d*(?:\.\d{0,2})?$/.test(value)) return;
+                    setSubmitError('');
+                    setFormData({ ...formData, price: value });
+                  }}
                   className="h-10 rounded-lg border-slate-200"
                 />
               </div>
+              {planData && Number(formData.price) === Number(planData.price) ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Enter a different price to start the Apple and Google store update.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -331,6 +360,14 @@ export function AddPlanModal({
               )}
             </Button>
           </div>
+          {submitError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {submitError}
+            </div>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

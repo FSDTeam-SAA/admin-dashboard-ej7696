@@ -13,8 +13,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Sparkles, Zap, Check, Pencil } from "lucide-react";
+import { Plus, Sparkles, Zap, Check, Pencil, RefreshCw, Trash2 } from "lucide-react";
 
 type PlanItem = {
   id: string;
@@ -32,6 +42,56 @@ type PlanCard = {
   accent: "starter" | "pro";
   professionalPlanPrice?: number;
   editable: boolean;
+};
+
+type StoreUpdateItem = {
+  productId: string;
+  basePlanId?: string;
+  status: string;
+  storeProductStatus?: string;
+  error?: string;
+};
+
+type StoreUpdateProvider = {
+  status: string;
+  items?: StoreUpdateItem[];
+  error?: string;
+};
+
+type StorePriceUpdate = {
+  _id: string;
+  target: "professional_plan" | "exam_unlock";
+  oldPrice: number;
+  newPrice: number;
+  currency: string;
+  status: string;
+  apple: StoreUpdateProvider;
+  google: StoreUpdateProvider;
+  database: StoreUpdateProvider;
+  initiatedBy?: { name?: string; email?: string };
+  retryCount?: number;
+  lastError?: string;
+  createdAt: string;
+};
+
+const statusClass = (status: string) => {
+  if (status === "confirmed" || status === "completed") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (["failed", "partial"].includes(status)) {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (status === "skipped") {
+    return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+  return "border-amber-200 bg-amber-50 text-amber-700";
+};
+
+const providerSummary = (provider?: StoreUpdateProvider) => {
+  const items = provider?.items ?? [];
+  if (!items.length) return provider?.status ?? "pending";
+  const confirmed = items.filter((item) => item.status === "confirmed").length;
+  return `${provider?.status ?? "pending"} (${confirmed}/${items.length})`;
 };
 
 const starterFeatures = [
@@ -75,6 +135,8 @@ export default function SubscriptionsPage() {
     useState(false);
   const [referralCommissionPercent, setReferralCommissionPercent] =
     useState("");
+  const [pendingDeleteJob, setPendingDeleteJob] =
+    useState<StorePriceUpdate | null>(null);
 
   const {
     data: pricingData,
@@ -85,6 +147,57 @@ export default function SubscriptionsPage() {
   });
 
   const pricing = pricingData?.data?.data;
+  const {
+    data: updateHistoryData,
+    refetch: refetchUpdateHistory,
+    isLoading: isHistoryLoading,
+  } = useQuery(
+    "coordinated-price-updates",
+    () => paymentAPI.getCoordinatedPriceUpdates({ limit: 20 }),
+    {
+      refetchInterval: 5000,
+      onSuccess: () => refetch(),
+    },
+  );
+  const updateHistory: StorePriceUpdate[] = updateHistoryData?.data?.data ?? [];
+
+  const { mutate: retryPriceUpdate, isLoading: isRetryingPriceUpdate } =
+    useMutation(
+      (jobId: string) => paymentAPI.retryCoordinatedPriceUpdate(jobId),
+      {
+        onSuccess: () => {
+          toast.success("Price update retry queued");
+          refetchUpdateHistory();
+        },
+        onError: (error: any) => {
+          toast.error(
+            error?.response?.data?.message || error?.message || "Failed to retry price update",
+          );
+        },
+      },
+    );
+  const { mutate: deletePriceUpdate, isLoading: isDeletingPriceUpdate } =
+    useMutation(
+      (jobId: string) => paymentAPI.deleteCoordinatedPriceUpdate(jobId),
+      {
+        onSuccess: () => {
+          toast.success("Failed price update history deleted");
+          setPendingDeleteJob(null);
+          refetchUpdateHistory();
+        },
+        onError: (error: any) => {
+          toast.error(
+            error?.response?.data?.message ||
+              error?.message ||
+              "Failed to delete price update history",
+          );
+        },
+      },
+    );
+
+  const handleDeletePriceUpdate = (job: StorePriceUpdate) => {
+    setPendingDeleteJob(job);
+  };
   const hideAddNewPlan = Number(pricing?.professionalPlanPrice) === 170;
   const currentReferralCommissionPercent = useMemo(() => {
     const rate = Number(pricing?.referralCommissionRate ?? 0.1);
@@ -100,38 +213,24 @@ export default function SubscriptionsPage() {
           throw new Error("Exam unlock price must be a positive number");
         }
 
-        const proPrice = Number(pricing?.professionalPlanPrice ?? 180);
-        const proIntervalCount = Number(
-          pricing?.professionalPlanIntervalCount ?? 3,
-        );
-        const proIntervalUnit =
-          pricing?.professionalPlanIntervalUnit ?? "months";
-        const proFeatures = Array.isArray(pricing?.professionalPlanFeatures)
-          ? pricing.professionalPlanFeatures
-          : defaultProFeatures;
-
-        return paymentAPI.updatePricing({
-          examUnlockPrice: price,
-          professionalPlanPrice: Number.isFinite(proPrice) ? proPrice : 180,
-          currency: pricing?.currency ?? "USD",
-          professionalPlanIntervalCount: Number.isFinite(proIntervalCount)
-            ? proIntervalCount
-            : 3,
-          professionalPlanIntervalUnit: proIntervalUnit,
-          professionalPlanDescription:
-            pricing?.professionalPlanDescription ||
-            "What's included in your plan",
-          professionalPlanFeatures: proFeatures,
+        return paymentAPI.startCoordinatedPriceUpdate({
+          target: "exam_unlock",
+          price,
+          currency: "USD",
         });
       },
       {
         onSuccess: () => {
-          toast.success("Exam unlock price updated");
+          toast.success("Exam unlock coordinated price update started");
           setIsExamPriceModalOpen(false);
-          refetch();
+          refetchUpdateHistory();
         },
         onError: (error: any) => {
-          toast.error(error?.message || "Failed to update exam unlock price");
+          toast.error(
+            error?.response?.data?.message ||
+              error?.message ||
+              "Failed to start exam unlock price update",
+          );
         },
       },
     );
@@ -355,10 +454,126 @@ export default function SubscriptionsPage() {
             ))}
       </div>
 
+      <section className="max-w-7xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Store Price Update History</h2>
+            <p className="text-xs text-slate-500">
+              Apple is updated first. Google Play updates after Apple confirms.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-full"
+            onClick={() => refetchUpdateHistory()}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {isHistoryLoading ? (
+            <Skeleton className="h-28 w-full" />
+          ) : updateHistory.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+              No coordinated price updates yet.
+            </div>
+          ) : (
+            updateHistory.map((job) => (
+              <div key={job._id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(job.status)}`}>
+                        {job.status}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {job.target === "professional_plan" ? "Professional Plan" : "Exam Unlock (9 products)"}
+                      </span>
+                      <span className="text-sm text-slate-600">
+                        ${Number(job.oldPrice).toFixed(2)} → ${Number(job.newPrice).toFixed(2)} USD
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {new Date(job.createdAt).toLocaleString()} · {job.initiatedBy?.name || job.initiatedBy?.email || "Admin"}
+                      {job.retryCount ? ` · ${job.retryCount} retries` : ""}
+                    </p>
+                  </div>
+                  {["failed", "partial"].includes(job.status) ? (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        disabled={isDeletingPriceUpdate || isRetryingPriceUpdate}
+                        onClick={() => handleDeletePriceUpdate(job)}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="rounded-full bg-[#1E3A8A] text-white"
+                        disabled={isRetryingPriceUpdate || isDeletingPriceUpdate}
+                        onClick={() => retryPriceUpdate(job._id)}
+                      >
+                        <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                        Retry
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {[
+                    ["Apple App Store", job.apple],
+                    ["Google Play", job.google],
+                  ].map(([label, provider]) => {
+                    const value = provider as StoreUpdateProvider;
+                    return (
+                      <div key={label as string} className={`rounded-lg border p-3 ${statusClass(value?.status || "pending")}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold">{label as string}</span>
+                          <span className="text-xs capitalize">{providerSummary(value)}</span>
+                        </div>
+                        {value?.error ? <p className="mt-1 text-xs">{value.error}</p> : null}
+                        {(value?.items ?? []).some((item) => item.error) ? (
+                          <details className="mt-2 text-xs">
+                            <summary className="cursor-pointer font-medium">Product errors</summary>
+                            <div className="mt-1 space-y-1">
+                              {(value.items ?? [])
+                                .filter((item) => item.error)
+                                .map((item) => (
+                                  <p key={`${item.productId}:${item.basePlanId || ""}`}>
+                                    {item.productId}
+                                    {item.basePlanId ? `:${item.basePlanId}` : ""}: {item.error}
+                                  </p>
+                                ))}
+                            </div>
+                          </details>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                {job.lastError ? <p className="mt-2 text-xs text-red-600">Latest: {job.lastError}</p> : null}
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       <AddPlanModal
         isOpen={isPlanModalOpen}
         onClose={() => setIsPlanModalOpen(false)}
-        onSuccess={refetch}
+        onSuccess={() => {
+          refetch();
+          refetchUpdateHistory();
+        }}
         planData={
           editingPlan
             ? {
@@ -374,6 +589,52 @@ export default function SubscriptionsPage() {
         }
         isEdit={Boolean(editingPlan)}
       />
+
+      <AlertDialog
+        open={Boolean(pendingDeleteJob)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingPriceUpdate) setPendingDeleteJob(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-2xl border-slate-200 bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900">
+              Delete failed update history?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              {pendingDeleteJob ? (
+                <>
+                  This will permanently remove the failed{" "}
+                  <span className="font-semibold text-slate-800">
+                    {pendingDeleteJob.target === "professional_plan"
+                      ? "Professional Plan"
+                      : "Exam Unlock"}
+                  </span>{" "}
+                  update from ${Number(pendingDeleteJob.oldPrice).toFixed(2)} to ${Number(pendingDeleteJob.newPrice).toFixed(2)}.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingPriceUpdate}
+              className="rounded-full"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingPriceUpdate || !pendingDeleteJob}
+              onClick={(event) => {
+                event.preventDefault();
+                if (pendingDeleteJob) deletePriceUpdate(pendingDeleteJob._id);
+              }}
+              className="rounded-full bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingPriceUpdate ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={isExamPriceModalOpen}
@@ -417,7 +678,7 @@ export default function SubscriptionsPage() {
                 onClick={() => updateExamPrice()}
                 disabled={isUpdatingExamPrice}
               >
-                {isUpdatingExamPrice ? "Updating..." : "Update"}
+                {isUpdatingExamPrice ? "Starting..." : "Start Coordinated Update"}
               </Button>
             </div>
           </div>
