@@ -248,6 +248,14 @@ export const paymentAPI = {
   getPricingSettings: () =>
     axiosInstance.get('/api/v1/payments/admin/pricing'),
 
+  saveExamStoreProducts: (examId: string, data: {
+    appleProductId: string;
+    googleProductId: string;
+    googleBasePlanId: string;
+    revenueCatAppleProductId: string;
+    revenueCatGoogleProductId: string;
+  }) => axiosInstance.put(`/api/v1/payments/admin/pricing/exams/${examId}/products`, data),
+
   startCoordinatedPriceUpdate: (data: {
     target: 'professional_plan' | 'exam_unlock';
     price: number;

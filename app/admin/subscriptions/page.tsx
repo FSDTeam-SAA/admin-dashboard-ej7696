@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddPlanModal } from "@/components/admin/subscriptions/plan-modal";
+import { ExamStoreProductsModal } from "@/components/admin/subscriptions/exam-store-products-modal";
 import {
   Dialog,
   DialogContent,
@@ -130,6 +131,7 @@ export default function SubscriptionsPage() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanCard | null>(null);
   const [isExamPriceModalOpen, setIsExamPriceModalOpen] = useState(false);
+  const [isExamProductsModalOpen, setIsExamProductsModalOpen] = useState(false);
   const [examUnlockPrice, setExamUnlockPrice] = useState("");
   const [isReferralCommissionModalOpen, setIsReferralCommissionModalOpen] =
     useState(false);
@@ -362,6 +364,13 @@ export default function SubscriptionsPage() {
             <Plus className="mr-2 h-4 w-4" />
             Exam Unlock Price
           </Button>
+          <Button
+            className="h-10 rounded-full bg-[#1E3A8A] px-6 text-white hover:bg-[#1C357B]"
+            onClick={() => setIsExamProductsModalOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Exam Store Products
+          </Button>
 {/* 
           {Number(pricing?.professionalPlanPrice ?? 0) > 0 && !hideAddNewPlan && (
             <Button
@@ -490,7 +499,7 @@ export default function SubscriptionsPage() {
                         {job.status}
                       </span>
                       <span className="text-sm font-semibold text-slate-900">
-                        {job.target === "professional_plan" ? "Professional Plan" : "Exam Unlock (9 products)"}
+                        {job.target === "professional_plan" ? "Professional Plan" : `Exam Unlock (${job.apple.items?.length ?? 0} products)`}
                       </span>
                       <span className="text-sm text-slate-600">
                         ${Number(job.oldPrice).toFixed(2)} → ${Number(job.newPrice).toFixed(2)} USD
@@ -589,6 +598,7 @@ export default function SubscriptionsPage() {
         }
         isEdit={Boolean(editingPlan)}
       />
+      <ExamStoreProductsModal open={isExamProductsModalOpen} onOpenChange={setIsExamProductsModalOpen} />
 
       <AlertDialog
         open={Boolean(pendingDeleteJob)}
